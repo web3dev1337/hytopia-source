@@ -32,6 +32,7 @@ import Chunk from '../chunks/Chunk';
 import Assets from '../network/Assets';
 import EventRouter from '../events/EventRouter';
 import Game from '../Game';
+import MobileManager from '../mobile/MobileManager';
 import { modalAlert } from '../ui/Modal';
 import { NetworkManagerEventType } from '../network/NetworkManager';
 import { getTransparentSortKey, lerpColor } from '../three/utils';
@@ -492,7 +493,10 @@ export default class Renderer {
   private _onClientSettingsUpdate = (_payload: ClientSettingsEventPayload.IUpdate): void => {
     const { resolution } = this._game.settingsManager.qualityPerfTradeoff;
 
-    this._renderer.setPixelRatio(window.devicePixelRatio * resolution.multiplier);
+    const devicePixelRatio = MobileManager.isMobile
+      ? Math.min(window.devicePixelRatio, 2.0)
+      : window.devicePixelRatio;
+    this._renderer.setPixelRatio(devicePixelRatio * resolution.multiplier);
 
     this._clampTargetFogNearAndFar();
     this._setupFog();
@@ -590,7 +594,11 @@ export default class Renderer {
 
   private _setupRenderer(): void {
     this._renderer.setSize(document.documentElement.clientWidth, document.documentElement.clientHeight);
-    this._renderer.setPixelRatio(window.devicePixelRatio * this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier);
+    const resolutionMultiplier = this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier;
+    const devicePixelRatio = MobileManager.isMobile
+      ? Math.min(window.devicePixelRatio, 2.0)
+      : window.devicePixelRatio;
+    this._renderer.setPixelRatio(devicePixelRatio * resolutionMultiplier);
     this._renderer.info.autoReset = false;
     this._renderer.localClippingEnabled = false;
     // Be explicit about output space; this is cheap and avoids surprises across Three.js versions.
