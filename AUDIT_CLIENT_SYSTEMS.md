@@ -13,15 +13,17 @@ Scope: `client/src/network/`, `client/src/input/`, `client/src/mobile/`, `client
 
 File: `client/src/bridge/BridgeManager.ts:220`
 
-`_sendParentMessage` calls `window.parent.postMessage(message, '*')` with a wildcard `'*'` target origin. This means any parent page (including a malicious one that iframes the client) can receive all bridge messages: chat messages, player data, reconnect URLs, notification permission requests, and key-down events.
+**Status (verified): partially correct / slightly mis-framed.**
 
-Additionally, `_onParentMessage` at line 152 processes all incoming `message` events without checking `event.origin`. A malicious parent frame could inject:
+Using `window.parent.postMessage(message, '*')` does mean the client will send bridge data to whatever origin is hosting the parent frame. If the client can be embedded by untrusted origins, this can become a data exfiltration vector. If embedding is restricted (for example via `frame-ancestors` / X-Frame-Options on the served client), the wildcard target origin becomes much less relevant.
+
+The more direct issue is that `_onParentMessage` processes incoming `message` events without validating `event.origin` and without checking `event.source === window.parent` (`client/src/bridge/BridgeManager.ts:152`). A malicious embedding parent (or any window with a handle) could inject:
 - `SEND_CHAT_MESSAGE` to send arbitrary chat messages as the player
 - `SET_QUALITY_PRESET` to force POWER_SAVING mode (griefing)
 - `LOCK_POINTER` / `UNLOCK_POINTER` to disrupt gameplay
 - `TOGGLE_DEBUG` to expose debug info
 
-**Fix:** Replace `'*'` with the known parent origin (e.g. `https://play.hytopia.com` or pass it via config). In `_onParentMessage`, validate `event.origin` against an allowlist before processing.
+**Fix:** In `_onParentMessage`, validate both `event.source` (must be `window.parent`) and `event.origin` (allowlist) before processing. Optionally also replace `'*'` with the expected parent origin to prevent accidental embedding data leaks.
 
 ---
 

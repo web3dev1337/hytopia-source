@@ -122,7 +122,9 @@ query: `{
   userById(id: "${userId}") {
 ```
 
-The `userId` parameter is interpolated directly into a GraphQL query string without sanitization. If `userId` comes from an untrusted source (e.g., derived from session data that could be manipulated), an attacker could inject arbitrary GraphQL operations. Even if `userId` is always server-controlled today, this is a ticking time bomb if the call surface ever expands.
+**Status (verified): sink is real; exploitability depends on trust boundary.**
+
+The `userId` parameter is interpolated directly into a GraphQL query string without sanitization. In the current code path, `userId` originates from platform session data (`session.user.id`) and is expected to be a platform-controlled identifier. That makes practical injection less likely today, but the pattern is still a footgun if this ever becomes user-controllable or if IDs stop being strictly validated.
 
 **Recommendation:** Use GraphQL variables instead of string interpolation:
 ```typescript

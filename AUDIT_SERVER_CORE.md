@@ -7,7 +7,11 @@
 
 File: server/src/persistence/PersistenceManager.ts:115-121
 
-`setPlayerData` loads the current player data, merges the new keys in memory, but never calls `this._saveStatesClient.save()` to write back. The merged data lives only in the local variable `playerData` and is lost. This means player data is never actually persisted -- the only thing that happens is a read followed by a local object mutation that goes nowhere.
+**Status (verified): false positive (with a caveat).**
+
+`SaveStatesClient.load()` returns a proxied object that tracks mutations and is periodically flushed by the SaveStates client itself (and on `unload()`). In that model, mutating the returned object is the intended way to persist changes; an explicit `save()` call is not required.
+
+**Caveat:** `PersistenceManager.getPlayerData()` currently returns `{}` when the persistence load fails. Mutating that fallback object will not persist anything. That is a real behavior gap, but it is different from “writes never persist”.
 
 ```typescript
 public async setPlayerData(player: Player, data: Record<string, unknown>): Promise<void> {
@@ -28,7 +32,11 @@ public async setPlayerData(player: Player, data: Record<string, unknown>): Promi
 
 File: server/src/persistence/PersistenceManager.ts:56-71
 
-When `PlatformGateway.instance.getGlobalData(key)` returns `undefined` or `null` (e.g., network failure), the code enters the next check `dataResult.error.code === 'keyNotFound'` which throws a TypeError because `dataResult` is nullish. The first `if` only passes when `dataResult` is truthy AND has no error, so falsy `dataResult` falls through to the `.error.code` check.
+**Status (verified): likely incorrect as written.**
+
+`PlatformGateway.getGlobalData()` returns a `ServiceResponseDto`-shaped object (success variant has `error: undefined`, error variant has `error: { code, message }`). It should not return `undefined`/`null` unless it throws/rejects.
+
+The real risk here is **uncaught exceptions / rejected promises** from the gateway call causing `getGlobalData()` itself to reject (no retry), rather than a deterministic “null deref” at `dataResult.error.code`.
 
 ```typescript
 if (dataResult && !dataResult.error) {  // dataResult=undefined -> false

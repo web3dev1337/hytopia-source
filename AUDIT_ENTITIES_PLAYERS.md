@@ -9,7 +9,11 @@
 
 File: server/src/worlds/entities/Entity.ts:1323 (spawn) and server/src/worlds/entities/Entity.ts:782 (despawn)
 
-During `spawn()`, each collider is registered in the world's `ColliderMap` via `world.simulation.colliderMap.setColliderEntity(collider, this)` (line 1384). During `despawn()`, `removeFromSimulation()` is called which removes the raw Rapier collider, but `colliderMap.removeColliderEntity()` is **never called**. The `_colliderHandleEntityMap` inside `ColliderMap` retains stale references to despawned entities, preventing garbage collection and causing the map to grow unboundedly. On a server with frequent entity spawn/despawn cycles (e.g. projectiles, mobs), this is a genuine memory leak.
+**Status (verified): false positive under normal simulation stepping.**
+
+Although `Entity.spawn()` registers colliders into `ColliderMap`, collider removal goes through `Simulation.removeRawCollider()`, which queues the collider handle for cleanup and `ColliderMap.cleanup()` runs each physics step. Under normal server operation (world loop continues stepping), stale entity references are cleared and this does **not** grow unboundedly.
+
+**Edge case:** if the simulation stops stepping after removals are queued (e.g., a world is stopped/paused without a final cleanup), queued handles could linger until the next step.
 
 **Fix:** In `Entity.despawn()`, before `this.removeFromSimulation()`, iterate colliders and call `this._world!.simulation.colliderMap.removeColliderEntity(collider)` for each.
 
