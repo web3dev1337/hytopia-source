@@ -1,41 +1,56 @@
 # iPhone Pro Performance Analysis — Lag, Input Delay & Overheating
 
-## Problem Statement
+## Accuracy / Scope
 
-High-end iPhones (13 Pro, 14 Pro, 15 Pro, 16 Pro) experience:
+This doc is written to be **factually accurate** by:
+- Separating **verified code facts** from **hypotheses / expected impact**.
+- Avoiding device-spec claims (thermals, bandwidth, exact DPR/model mappings, exact latency deltas) unless they are measured and recorded.
+
+All code references were verified against the current repo state on **2026-03-02**.
+
+## Problem Statement (Reported)
+
+Reported on high-end iPhones (13 Pro, 14 Pro, 15 Pro, 16 Pro):
 - Sustained lag and frame drops after a few minutes of gameplay
-- Multi-second input delay
+- Perceived input delay
 - Device overheating / thermal throttling
 
-Meanwhile, lower-end iPhones (SE, 12, 13 base, 14 base) run the game at acceptable performance with the same codebase.
+Reported that some lower-end iPhones (SE, 12, 13 base, 14 base) run at acceptable performance with the same codebase.
 
-## Root Cause Summary
+## Root Cause Summary (Most Likely, Based on Code)
 
-**Pro iPhones have 120Hz ProMotion displays and 3x device pixel ratio. The client detects these capabilities but does nothing to compensate — it renders at full 120fps, at 3x pixel density, with all post-processing enabled, and no FPS cap. This results in 4.5x more GPU work than a base iPhone running the same quality preset.**
+On devices where `requestAnimationFrame()` runs at higher refresh rates (for example 120Hz ProMotion):
+- The default mobile quality preset is `MEDIUM`, and `MEDIUM` has **no FPS cap**. (`client/src/settings/SettingsManager.ts`, `client/src/core/Renderer.ts:249-271`)
+- The renderer runs at full `window.devicePixelRatio * resolution.multiplier` (no DPR cap). (`client/src/core/Renderer.ts:495`, `client/src/core/Renderer.ts:593`)
+- `MEDIUM` enables **outline + bloom + SMAA** post-processing. (`client/src/settings/SettingsManager.ts:86-101`)
 
-Lower-end iPhones naturally sit at 60Hz / 2x DPR and never exceed their thermal budget.
+Expected impact (hypothesis): total per-second render work scales roughly with:
+
+`frames/sec * pixels/frame * (full-screen passes + scene passes)`
+
+So a device that drives the game loop at 120Hz can be pushed much harder than a 60Hz device if we do not cap FPS and/or resolution.
 
 ---
 
-## Issue Matrix
+## Issue List (Prioritized)
 
-Ranked by combined likelihood x impact.
+Ranked by expected impact based on code inspection (profiling still required).
 
-| # | Issue | Likelihood | Impact | Fix Complexity | Confidence | Risk of Fix |
-|---|-------|-----------|--------|---------------|------------|-------------|
-| 1 | No FPS cap on MEDIUM/HIGH — 120Hz uncapped | 99% | Critical | Low | Very High | Low |
-| 2 | 3x devicePixelRatio renders 2.25x more pixels than 2x | 99% | Critical | Low | Very High | Low |
-| 3 | Outline shader: O(128) texture samples/pixel at 120Hz + 3x DPR | 95% | Critical | Medium | High | Medium |
-| 4 | All post-processing (outline+bloom+SMAA) enabled on MEDIUM | 95% | High | Low | Very High | Low |
-| 5 | Auto-quality ping-pong: throttle -> downgrade -> cool -> upgrade -> repeat | 90% | High | Medium | High | Low |
-| 6 | Input hardcoded to 30Hz on ALL mobile — 4x mismatch with 120Hz render | 85% | High | Low | High | Low |
-| 7 | CSS2DRenderer: DOM thrashing 120x/sec (z-sort, style writes, distance calcs) | 85% | High | Medium | High | Medium |
-| 8 | gunzipSync() + msgpack deserialization synchronous on main thread | 80% | High | High | High | Medium |
-| 9 | No WebTransport on iOS Safari — forced WebSocket fallback | 75% | Medium | N/A (Apple) | Very High | N/A |
-| 10 | Aggressive chunk batch loading — no rate limiting to worker | 70% | Medium | Medium | Medium | Low |
-| 11 | Single Web Worker for all chunk meshing | 65% | Medium | Medium | Medium | Medium |
-| 12 | Touch event listeners not passive — iOS scroll jank | 60% | Low-Med | Low | Medium | Low |
-| 13 | Entity updates never skip frames on high-FPS devices | 55% | Medium | Medium | Medium | Low |
+| # | Issue | Verified in code? | Fix complexity |
+|---|-------|-------------------|----------------|
+| 1 | No FPS cap on `MEDIUM` (default mobile) | Yes | Low |
+| 2 | Pixel ratio uses full `window.devicePixelRatio` (no cap) | Yes | Low |
+| 3 | Outline pass has high worst-case texture sampling cost | Yes | Medium |
+| 4 | `MEDIUM` enables all post-processing effects | Yes | Low |
+| 5 | Auto-quality thresholds are poorly suited to high refresh rates | Yes | Medium |
+| 6 | Mobile input packets are sent at 30Hz | Yes | Low |
+| 7 | CSS2DRenderer updates DOM every frame | Yes | Medium |
+| 8 | gzip decompression + msgpack decode are synchronous on main thread | Yes | High |
+| 9 | WebTransport availability is browser-dependent; fallback is WebSocket | Yes | N/A |
+| 10 | Chunk batch build messages are posted in a burst (no throttling) | Yes | Medium |
+| 11 | Chunk meshing runs in a single Web Worker | Yes | Medium |
+| 12 | Pointer listeners are not registered as passive | Yes | Low |
+| 13 | Entity update skipping is per-frame, so higher FPS means more updates/sec | Yes | Medium |
 
 ---
 
@@ -43,9 +58,11 @@ Ranked by combined likelihood x impact.
 
 ### 1. No FPS Cap on MEDIUM/HIGH Presets (The Smoking Gun)
 
-**Location:** `client/src/settings/SettingsManager.ts:57-140`
+**Location:** `client/src/settings/SettingsManager.ts:86-139`, `client/src/core/Renderer.ts:249-271`
 
-Only `POWER_SAVING` has `fpsCap: 30`. The `MEDIUM` and `HIGH` presets have no FPS cap at all:
+Verified:
+- Only `POWER_SAVING` sets `fpsCap` (`fpsCap: 30`). `MEDIUM` and `HIGH` do not set `fpsCap`. (`client/src/settings/SettingsManager.ts:86-139`)
+- The FPS cap only applies when `fpsCap` is set; otherwise, the render loop runs on every `requestAnimationFrame()` tick. (`client/src/core/Renderer.ts:249-271`)
 
 ```typescript
 MEDIUM: {
@@ -57,22 +74,15 @@ MEDIUM: {
 },
 ```
 
-Pro iPhones fire `requestAnimationFrame` 120 times per second. Every frame runs the full pipeline:
-- Fog update
-- Camera update
-- Entity manager updates
-- CSS2D scene UI render
-- Outline pass (5 render targets, 128 texture samples per edge pixel)
-- Bloom pass
-- SMAA pass
+Expected impact (hypothesis):
+- On high-refresh-rate devices, `requestAnimationFrame()` can fire faster (often up to 120Hz).
+- With no FPS cap on `MEDIUM`, every frame runs the full client update/render pipeline, including post-processing when enabled. (`client/src/core/Renderer.ts:249-320`)
 
-This is 2x the work of a 60Hz device, sustained indefinitely. The GPU runs hot, iOS thermal-throttles at ~80C, FPS drops, quality auto-adjusts down, GPU cools, quality goes back up — infinite oscillation loop.
-
-**Suggested fix:** Add `fpsCap: 60` to MEDIUM preset. Single line change, immediate relief.
+**Suggested fix:** Add `fpsCap: 60` to the `MEDIUM` preset. This will cause the render loop to early-return on some `requestAnimationFrame()` ticks to keep updates/renders at or below the cap. (`client/src/core/Renderer.ts:256-271`)
 
 ---
 
-### 2. 3x Device Pixel Ratio Unscaled
+### 2. Device Pixel Ratio Is Uncapped
 
 **Location:** `client/src/core/Renderer.ts:495`
 
@@ -80,14 +90,12 @@ This is 2x the work of a 60Hz device, sustained indefinitely. The GPU runs hot, 
 this._renderer.setPixelRatio(window.devicePixelRatio * resolution.multiplier);
 ```
 
-| Device | devicePixelRatio | multiplier (MEDIUM) | Effective | Total Pixels |
-|--------|-----------------|---------------------|-----------|-------------|
-| iPhone 15 Pro Max | 3.0 | 1.0 | 3.0x | ~8.9M |
-| iPhone 12/13/14 base | 2.0 | 1.0 | 2.0x | ~4.0M |
+Verified:
+- Effective pixel ratio is `window.devicePixelRatio * multiplier` and is not capped anywhere in the renderer. (`client/src/core/Renderer.ts:495`, `client/src/core/Renderer.ts:593`)
 
-The Pro iPhone renders **2.25x more pixel fragments** per frame. Combined with 2x the frame rate (120 vs 60), this is **4.5x more total GPU work** with the same quality preset.
-
-The A18 Pro GPU is not 4.5x more powerful than the A15/A16 — it thermal-throttles first.
+Facts (math):
+- Pixels per frame scale with the **square** of effective pixel ratio.
+- Example ratio: if effective DPR is 3 vs 2 at the same CSS size, pixel count is `(3/2)^2 = 2.25x`.
 
 **Suggested fix:** Cap effective pixel ratio for mobile:
 ```typescript
@@ -97,35 +105,34 @@ this._renderer.setPixelRatio(cappedDpr * resolution.multiplier);
 
 ---
 
-### 3. Outline Shader Exponential Cost at High Resolution
+### 3. Outline Pass Worst-Case Sampling Cost Is High
 
 **Location:** `client/src/three/postprocessing/SelectiveOutlinePass.ts:284-316`
 
-The outline fragment shader has a nested loop:
+Verified:
+- The outline shader has a bounded nested loop up to `MAX_THICKNESS` (16) and 8 directions. (`client/src/three/postprocessing/SelectiveOutlinePass.ts:20-21`, `client/src/three/postprocessing/SelectiveOutlinePass.ts:284-316`)
+- Each inner iteration samples **both** mask textures (`tMask` and `tMask2`) and may also sample depth textures. (`client/src/three/postprocessing/SelectiveOutlinePass.ts:292-313`)
 
 ```glsl
 for (int t = 1; t <= MAX_THICKNESS; t++) {       // t = 1..16
   float thickness = float(t);
   for (int i = 0; i < 8; i++) {                   // 8 directions
     vec2 sampleUv = vUv + offsets[i] * texel * thickness;
-    float sId1 = texture2D(maskTexture, sampleUv).r * 255.0;
-    float sId2 = texture2D(maskTexture2, sampleUv).r * 255.0;
-    // ... depth reads, interpolation ...
+    float sId1 = texture2D(tMask, sampleUv).r * 255.0;
+    float sId2 = texture2D(tMask2, sampleUv).r * 255.0;
+    // depth reads are conditional on edge detection
   }
 }
 ```
 
-**16 steps x 8 directions = 128 texture samples per edge pixel**, plus depth buffer reads.
+Facts (shader worst-case bounds, per pixel):
+- Pre-check loop: 8 directions × 2 mask samples = **16** mask texture samples. (`client/src/three/postprocessing/SelectiveOutlinePass.ts:265-273`)
+- Search loop: 16 thickness steps × 8 directions × 2 mask samples = **256** mask texture samples, plus conditional depth reads. (`client/src/three/postprocessing/SelectiveOutlinePass.ts:284-316`)
 
-Memory bandwidth math on Pro iPhone at 120Hz:
-- 8.9M pixel fragments x 128 samples = **1.1 billion texture lookups per frame**
-- At 120fps: **~132 billion texture accesses/sec**
-- iPhone 15 Pro memory bandwidth: ~150 GB/s
-- **GPU memory bus is ~88% saturated by the outline pass alone**
+Expected impact (hypothesis):
+- This pass is a full-screen post-process; on high FPS and/or high effective DPR, it can dominate GPU time.
 
-On base iPhone at 60Hz: 4.0M x 128 x 60 = ~30 billion/sec = sustainable.
-
-**Suggested fix:** Reduce `MAX_THICKNESS` to 8 on mobile, or disable outline entirely on 120Hz+ mobile devices.
+**Suggested fix:** Reduce outline thickness on mobile (for example clamp `maxThickness` lower), or disable outline in mobile presets where needed.
 
 ---
 
@@ -136,9 +143,9 @@ On base iPhone at 60Hz: 4.0M x 128 x 60 = ~30 billion/sec = sustainable.
 MEDIUM enables the full post-processing pipeline:
 ```typescript
 postProcessing: {
-  outline: true,   // 5 render targets, 128 samples/pixel
-  bloom: true,     // WhiteCoreBloomPass — additional fullscreen passes
-  smaa: true,      // Subpixel morphological antialiasing — 2 fullscreen passes
+  outline: true,
+  bloom: true,
+  smaa: true,
 }
 ```
 
@@ -148,27 +155,27 @@ LOW only disables bloom and SMAA but keeps outline. There is no intermediate pre
 
 ---
 
-### 5. Auto-Quality Ping-Pong
+### 5. Auto-Quality Thresholds Don’t Scale Well With High Refresh Rates
 
 **Location:** `client/src/settings/SettingsManager.ts:181-193, 287-311`
 
 The auto-quality system uses `refreshRate` as the target FPS:
 ```typescript
 const targetFps = this._game.performanceMetricsManager.refreshRate;
-// On Pro iPhone: targetFps = 120
 ```
 
-Sequence on Pro iPhone:
-1. Start at MEDIUM, rendering at 120fps — GPU sustains briefly
-2. GPU heats up over 5-10 seconds, iOS throttles, FPS drops to 70-80
-3. After 3 seconds below `LOW_FPS_THRESHOLD` (30) or `refreshRate * 0.5` (60), downgrade to LOW
-4. GPU cools, FPS recovers above `targetFps - 1` (119), upgrade timer starts
-5. After 5 seconds of high FPS, upgrade back to MEDIUM
-6. GPU heats up again — repeat
+Verified:
+- Upgrade condition: `fps >= targetFps - 1` for 5 seconds. (`client/src/settings/SettingsManager.ts:310`, `client/src/settings/SettingsManager.ts:181-183`)
+- Downgrade condition: `fps < min(30, targetFps * 0.5)` for 3 seconds. (`client/src/settings/SettingsManager.ts:311`, `client/src/settings/SettingsManager.ts:175-176`, `client/src/settings/SettingsManager.ts:181-183`)
 
-Capped at `MAX_QUALITY_BOUNCE_COUNT = 5` oscillations, but each quality change triggers renderer pixel ratio changes, texture reloads, and potential shader recompilation — all expensive on mobile.
+Implication (fact from the above thresholds):
+- For `targetFps = 120`, the upgrade threshold is ~119 FPS, while the downgrade threshold is still **30 FPS** (because `min(30, 120 * 0.5) = 30`).
+- That means the auto-quality system is unlikely to react while running in the “degraded but not catastrophic” range (for example 40–100 FPS).
 
-**Suggested fix:** Use a capped target FPS (e.g. 60) instead of raw refresh rate for quality decisions. Don't upgrade quality after a thermal-induced downgrade within the same session.
+Also verified:
+- On mobile, automatic quality increases are capped at `MEDIUM` (`MAX_QUALITY_LEVEL`). (`client/src/settings/SettingsManager.ts:198-199`)
+
+**Suggested fix:** Use a capped target FPS (e.g. 60) for auto-quality decisions, or redesign thresholds so they scale with refresh rate in a way that still responds meaningfully on 120Hz devices.
 
 ---
 
@@ -188,12 +195,13 @@ setInterval(() => {
 }, 1000 / inputUpdateHz); // 33ms on mobile
 ```
 
-On a Pro iPhone rendering at 120fps, visual updates happen every 8.3ms but input packets are sent every 33ms — a **4x mismatch**. The camera renders smoothly at 120fps but the server only receives position data at 30Hz. When frames drop, the fixed `setInterval` timer is decoupled from `requestAnimationFrame`, so input can queue up behind stalled frames.
+Facts:
+- On mobile, continuous input packets are sent at 30Hz.
+- On a 120Hz render loop, that is up to a **4x rate mismatch** between visual updates and input packet sends.
 
-This is a major contributor to the **perceived multi-second input delay** — it's not that input is literally delayed by seconds, but the combination of:
-- 30Hz input → server → response → client at 120Hz creates visible desync
-- During thermal throttle frame drops, input packets back up in the WebSocket queue
-- Server-side state lags behind what the player sees locally
+Expected impact (hypothesis):
+- This mismatch can increase perceived latency/desync (especially if render FPS is high but network input is limited to 30Hz).
+- Because input sending uses `setInterval()`, it is also sensitive to main-thread stalls (callbacks can be delayed under heavy load).
 
 **Suggested fix:** Increase mobile input Hz to 60, or tie input dispatch to `requestAnimationFrame` with a minimum interval.
 
@@ -206,14 +214,16 @@ This is a major contributor to the **perceived multi-second input delay** — it
 The file itself contains a comment admitting: *"CSS2DRenderer appears to be a major performance bottleneck."*
 
 Every frame, for every visible scene UI element:
-1. Clear distance cache (Map allocation)
-2. Calculate `distanceToSquared()` for every visible object
-3. Write `element.style.transform` (string comparison + DOM write)
-4. Write `element.style.display` (DOM write)
-5. Sort all visible objects by distance (O(n log n))
-6. Update `zIndex` CSS for every object
+1. Compute clip-space position and do a viewport visibility check
+2. Potentially write `element.style.display`
+3. Potentially write `element.style.transform`
+4. Compute `distanceToSquared()` and store in a Map
+5. Sort visible objects by distance (O(n log n))
+6. Potentially write `element.style.zIndex` for each visible object
 
-At 120fps with 20 scene UIs: **2,400+ DOM manipulations per second**. iOS Safari's compositor and layout engine are stressed far beyond what's needed — scene UIs rarely move fast enough to need 120Hz DOM updates.
+Expected impact (hypothesis):
+- This work scales with FPS and number of visible scene UI elements.
+- Even when the DOM writes are guarded by string comparison, the per-frame traversal, sorting, and style comparisons can be significant on mobile browsers.
 
 **Suggested fix:** Throttle CSS2DRenderer to 30Hz maximum regardless of frame rate. Cache distance calculations and only update on significant position changes (>1 unit delta).
 
@@ -224,37 +234,44 @@ At 120fps with 20 scene UIs: **2,400+ DOM manipulations per second**. iOS Safari
 **Location:** `client/src/network/NetworkManager.ts:376-385`
 
 ```typescript
-private _onMessage(data: ArrayBuffer): void {
-  const decompressed = gunzipSync(new Uint8Array(data));  // SYNCHRONOUS
-  const deserialized = packr.unpack(Buffer.from(decompressed));  // SYNCHRONOUS
-  // ... process all packets in loop ...
-}
+private _onMessage = (data: Uint8Array): void => {
+  let dataUint8Array = data;
+
+  if (this._isGzip(dataUint8Array)) {
+    dataUint8Array = new Uint8Array(gunzipSync(dataUint8Array));
+  }
+
+  const decodedData = packr.unpack(dataUint8Array);
+  // ... process packets ...
+};
 ```
 
-`gunzipSync()` is a synchronous gzip decompression that blocks the main thread. For a large chunk data packet, this can take 5-20ms. At 120Hz, a single frame budget is 8.3ms — one large packet can blow through 1-2 entire frames.
+Facts:
+- gzip decompression (when present) and msgpack decode both happen synchronously on the main thread.
+- Large payloads can therefore consume a meaningful portion of a frame budget, especially at higher refresh rates.
 
 **Suggested fix:** Move decompression + deserialization to a Web Worker. Post processed events back to main thread.
 
 ---
 
-### 9. No WebTransport on iOS Safari
+### 9. WebTransport Fallback to WebSocket Is Common (Browser-Dependent)
 
 **Location:** `client/src/network/NetworkManager.ts:141-149`
 
-iOS Safari (as of iOS 18.x) does not support WebTransport. The client falls back to WebSocket:
+Verified:
+- The client attempts WebTransport when the global `WebTransport` exists, and falls back to WebSocket if it is unavailable or fails. (`client/src/network/NetworkManager.ts:141-149`)
 
 ```typescript
 if (typeof WebTransport !== 'undefined') {
   await this._connectWebTransport();
 }
 if (!this._wt) {
-  await this._connectWebSocket(); // Fallback — always hits on iOS
+  await this._connectWebSocket(); // Fallback
 }
 ```
 
-WebSocket (TCP) has higher latency, no multiplexing, and head-of-line blocking compared to WebTransport (QUIC/UDP). This isn't fixable on our end — it's an Apple limitation.
-
-**Impact:** Adds ~10-30ms additional latency to every packet compared to WebTransport. Combined with #6 (30Hz input), this widens the input delay gap.
+Expected impact (hypothesis):
+- When WebSocket is used instead of WebTransport, head-of-line blocking and higher latency variance can make input feel worse, especially when combined with low input send rates. This needs measurement on target devices/browsers.
 
 ---
 
@@ -274,9 +291,9 @@ sortedBatches.forEach(batchId => {
 });
 ```
 
-No throttling — if the player moves and 30 batches need rebuilding, all 30 messages fire at once. The single Web Worker processes them sequentially, but each one runs greedy meshing (O(n^3) per batch) and transfers large TypedArrays back, forcing GC pressure on the main thread.
-
-High-end devices load more chunks due to higher quality presets staying active longer, so they queue more batches.
+Facts:
+- There is no throttling; the main thread posts a build message for every affected batch immediately.
+- The worker then processes those messages sequentially.
 
 **Suggested fix:** Rate-limit to 4-6 batch dispatches per frame.
 
@@ -290,13 +307,13 @@ High-end devices load more chunks due to higher quality presets staying active l
 private _worker: Worker = new Worker(new URL('./ChunkWorker.ts', import.meta.url), { type: 'module' });
 ```
 
-Only one Web Worker handles all chunk mesh generation. High-end devices with larger view distances queue significantly more batches, but the worker processes them one at a time.
+Only one Web Worker handles all chunk mesh generation. If many batches are queued (for example due to fast movement/teleports or large view distances), the worker processes them sequentially, which can become a bottleneck.
 
 **Suggested fix:** Spawn 2 workers on capable devices (use `navigator.hardwareConcurrency` check).
 
 ---
 
-### 12. Non-Passive Touch Event Listeners
+### 12. Pointer Event Listeners Are Not Registered as Passive
 
 **Location:** `client/src/input/InputManager.ts:281-284`
 
@@ -305,9 +322,11 @@ window.addEventListener('pointerdown', (event) => this._onPointerDown(event));
 window.addEventListener('pointerup', (event) => this._onPointerUp(event));
 ```
 
-No `{ passive: true }` flag. iOS Safari cannot use fast-path scrolling/touch handling when listeners are active (non-passive). This causes minor but measurable jank in touch event delivery.
+Facts:
+- These listeners do not pass `{ passive: true }`.
+- The handlers shown do not call `preventDefault()` (so they are eligible to be passive). (`client/src/input/InputManager.ts:343-389`)
 
-**Suggested fix:** Add `{ passive: true }` where `preventDefault()` is not called.
+**Suggested fix:** Add `{ passive: true }` where appropriate, then measure if it changes input/event handling performance on iOS.
 
 ---
 
@@ -324,28 +343,20 @@ private _shouldUpdateAnimationAndLocalMatrix(frameCount: number): boolean {
 }
 ```
 
-Frame skipping is based on distance ratio, which on high-quality presets (larger view distance) results in fewer skips. High-FPS devices sustain more updates per second, maintaining full entity overhead where lower-end devices naturally skip.
+Frame skipping is based on distance ratio; larger view distances reduce `distanceRatio`, which reduces `skipFrames` for a given entity distance. Because this decision is evaluated per frame, higher FPS also means more animation/matrix updates per second for entities that are scheduled to update.
 
 **Suggested fix:** Factor in actual frame rate, not just distance — skip more at 120fps.
 
 ---
 
-## Why Lower-End iPhones Work Fine
+## Work Scaling (Why 120Hz Can Hurt)
 
-| Factor | Pro iPhone | Base iPhone |
-|--------|-----------|-------------|
-| Refresh rate | 120Hz (uncapped) | 60Hz |
-| Device pixel ratio | 3x (8.9M pixels) | 2x (4.0M pixels) |
-| Starting quality | MEDIUM | MEDIUM |
-| GPU load per frame | 1x | 1x |
-| Frames per second | 120 | 60 |
-| **Total GPU work** | **4.5x** | **1x** |
-| Thermal headroom | Thin body, high power density | Adequate cooling |
-| Auto-quality target FPS | 120 (unreachable sustained) | 60 (achievable) |
-| Input vs render mismatch | 30Hz vs 120Hz (4x gap) | 30Hz vs 60Hz (2x gap) |
-| Outline shader bandwidth | ~132B texture accesses/sec | ~30B texture accesses/sec |
+Facts (math):
+- If FPS doubles (60 → 120) and the same work is done each frame, per-second work roughly doubles.
+- If effective DPR increases (2 → 3), pixels per frame increase by `(3/2)^2 = 2.25x`.
+- Combined worst-case example: `2x * 2.25x = 4.5x` more fragment work per second.
 
-The base iPhone sits comfortably within its thermal and GPU budget. The Pro iPhone is pushed 4.5x harder with zero compensation.
+Important: which iPhone models map to which DPR values depends on the model and iOS settings; do not assume “Pro = DPR 3, base = DPR 2”. Measure `window.devicePixelRatio` and the measured `requestAnimationFrame()` refresh rate on the actual target devices.
 
 ---
 
@@ -354,24 +365,24 @@ The base iPhone sits comfortably within its thermal and GPU budget. The Pro iPho
 ### Immediate (Low Complexity, High Impact)
 
 1. **Add `fpsCap: 60` to MEDIUM preset** — 1 line, immediate thermal relief
-2. **Cap mobile devicePixelRatio to 2.0** — 2 lines, 2.25x fewer pixels
-3. **Disable bloom + SMAA on mobile MEDIUM** — keep outline only
-4. **Increase mobile input Hz from 30 to 60** — reduce perceived input delay
+2. **Cap mobile effective DPR to 2.0** — reduces pixels/frame on devices where `devicePixelRatio > 2`
+3. **Disable bloom + SMAA on mobile MEDIUM (if needed)** — keep outline only, or disable outline first depending on profiling
+4. **Increase mobile input Hz from 30 to 60** — reduces input/render rate mismatch on high-refresh devices
 
 ### Short-Term (Medium Complexity)
 
-5. **Use capped target FPS (60) for auto-quality decisions** instead of raw refresh rate
+5. **Use capped target FPS (e.g. 60) for auto-quality decisions** instead of raw refresh rate
 6. **Throttle CSS2DRenderer to 30Hz** regardless of frame rate
 7. **Rate-limit chunk batch dispatch** to worker (max 4-6 per frame)
-8. **Reduce outline MAX_THICKNESS to 8** on mobile
+8. **Clamp outline thickness lower on mobile** (for example `maxThickness <= 8`)
 
 ### Medium-Term (Higher Complexity)
 
 9. **Move gunzipSync + deserialization to Web Worker**
 10. **Spawn multiple chunk mesh workers** on capable devices
-11. **Add passive flag to touch event listeners**
+11. **Add passive flag to pointer event listeners (where safe)**
 12. **Scale entity update frequency by actual FPS** (skip more at 120Hz)
 
 ### Not Fixable (Apple Platform Limitation)
 
-13. **WebTransport on iOS** — must wait for Apple to ship it in Safari
+13. **WebTransport on iOS (if unsupported)** — if the browser does not support WebTransport, the client must use WebSocket
