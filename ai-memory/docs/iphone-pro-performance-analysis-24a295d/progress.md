@@ -1,0 +1,7 @@
+- [x] Research renderer + performance settings
+- [x] Research mobile input + touch handling
+- [x] Research chunk meshing + worker systems
+- [x] Research network deserializer + game loop
+- [x] Verify critical code paths manually
+- [x] Write analysis document
+- [x] Commit and create PR
