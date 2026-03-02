@@ -99,6 +99,7 @@ export const QUALITY_PRESETS: Record<string, QualityPerfTradeoff> = {
       bloom: true,
       smaa: true,
     },
+    fpsCap: 60,
   },
   LOW: {
     // In performance-prioritized settings, setting antialias to false is preferable as it reduces
@@ -120,6 +121,7 @@ export const QUALITY_PRESETS: Record<string, QualityPerfTradeoff> = {
     postProcessing: {
       outline: true,
     },
+    fpsCap: 60,
   },
   POWER_SAVING: {
     antialias: true,
