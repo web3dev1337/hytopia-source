@@ -22,6 +22,8 @@ CONFIG:   package.json - Monorepo root (npm workspaces)
           server/eslint.config.js - ESLint + tsdoc
           client/vite.config.js - Vite dev server + basis transcoder copy
           protocol/package.json - Protocol package
+AUDITS:   AUDIT_FINAL_REPORT.md - Consolidated audit index + verification status
+          AUDIT_*.md - Area-specific audit reports (networking, server core, client, etc.)
 ```
 
 ## Server (`server/src/`)
