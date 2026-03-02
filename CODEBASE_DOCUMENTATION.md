@@ -124,7 +124,14 @@ shared/classes/Ticker.ts - Interval ticker
 shared/classes/IterationMap.ts - Map with ordered iteration
 shared/classes/Ajv.ts - AJV schema validator instance
 shared/helpers/msgpackr.ts - msgpackr serialization config
-shared/types/ - Type definitions (Outline, RgbColor, math types)
+shared/types/Outline.ts - Outline type
+shared/types/RgbColor.ts - RGB color type
+shared/types/math/QuaternionLike.ts - Quaternion interface
+shared/types/math/SpdMatrix3.ts - SPD matrix type
+shared/types/math/Vector2Boolean.ts - Per-axis boolean for Vector2
+shared/types/math/Vector2Like.ts - Vector2 interface
+shared/types/math/Vector3Boolean.ts - Per-axis boolean for Vector3
+shared/types/math/Vector3Like.ts - Vector3 interface
 ```
 
 ### Other
@@ -255,16 +262,108 @@ types/fetch.d.ts - Fetch type augmentation
 
 ## Protocol (`protocol/`)
 
+### Core
+
 ```
 index.ts - Package entry
 exports.ts - Re-exports
 packets/PacketCore.ts - Base packet class
 packets/PacketDefinitions.ts - Packet type registry
-packets/inbound/ - Client → Server packets (Input, ChatMessageSend, SyncRequest, etc.)
-packets/outbound/ - Server → Client packets (Entities, Chunks, Blocks, Camera, etc.)
-packets/bidirectional/ - Both directions (Heartbeat, Connection)
-schemas/ - AJV validation schemas for all packet fields
 shared/Ajv.ts - Shared AJV instance
+```
+
+### Packets — Inbound (Client → Server)
+
+```
+packets/inbound/index.ts - Inbound barrel export
+packets/inbound/Input.ts - Player input packet
+packets/inbound/ChatMessageSend.ts - Chat message send
+packets/inbound/SyncRequest.ts - State sync request
+packets/inbound/StateRequest.ts - Full state request
+packets/inbound/UIDataSend.ts - UI data from client
+packets/inbound/DebugConfig.ts - Debug configuration
+```
+
+### Packets — Outbound (Server → Client)
+
+```
+packets/outbound/index.ts - Outbound barrel export
+packets/outbound/Entities.ts - Entity state updates
+packets/outbound/Chunks.ts - Chunk data
+packets/outbound/Blocks.ts - Block changes
+packets/outbound/BlockTypes.ts - Block type definitions
+packets/outbound/Camera.ts - Camera state
+packets/outbound/Players.ts - Player state
+packets/outbound/Audios.ts - Audio events
+packets/outbound/ParticleEmitters.ts - Particle emitter state
+packets/outbound/SceneUIs.ts - Scene UI updates
+packets/outbound/UIDatas.ts - UI data to client
+packets/outbound/ChatMessages.ts - Chat messages
+packets/outbound/SyncResponse.ts - Sync response
+packets/outbound/World.ts - World state
+packets/outbound/Lights.ts - Light state
+packets/outbound/UI.ts - UI updates
+packets/outbound/PhysicsDebugRender.ts - Physics debug visualization
+packets/outbound/PhysicsDebugRaycasts.ts - Physics debug raycasts
+packets/outbound/NotificationPermissionRequest.ts - Notification permission
+```
+
+### Packets — Bidirectional
+
+```
+packets/bidirectional/index.ts - Bidirectional barrel export
+packets/bidirectional/Heartbeat.ts - Keep-alive heartbeat
+packets/bidirectional/Connection.ts - Connection lifecycle
+```
+
+### Schemas (AJV validation)
+
+```
+schemas/index.ts - Schema barrel export
+schemas/Entity.ts - Entity schema
+schemas/Entities.ts - Entities collection schema
+schemas/Block.ts - Block schema
+schemas/Blocks.ts - Blocks collection schema
+schemas/BlockType.ts - Block type schema
+schemas/BlockTypes.ts - Block types collection schema
+schemas/Chunk.ts - Chunk schema
+schemas/Chunks.ts - Chunks collection schema
+schemas/Player.ts - Player schema
+schemas/Players.ts - Players collection schema
+schemas/Audio.ts - Audio schema
+schemas/Audios.ts - Audios collection schema
+schemas/Camera.ts - Camera schema
+schemas/ChatMessage.ts - Chat message schema
+schemas/ChatMessages.ts - Chat messages collection schema
+schemas/Connection.ts - Connection schema
+schemas/DebugConfig.ts - Debug config schema
+schemas/Heartbeat.ts - Heartbeat schema
+schemas/HexColor.ts - Hex color validation
+schemas/Input.ts - Input schema
+schemas/Light.ts - Light schema
+schemas/Lights.ts - Lights collection schema
+schemas/ModelAnimation.ts - Model animation schema
+schemas/ModelNodeOverride.ts - Model node override schema
+schemas/NotificationPermissionRequest.ts - Notification permission schema
+schemas/Outline.ts - Outline schema
+schemas/ParticleEmitter.ts - Particle emitter schema
+schemas/ParticleEmitters.ts - Particle emitters collection schema
+schemas/PhysicsDebugRaycast.ts - Physics debug raycast schema
+schemas/PhysicsDebugRaycasts.ts - Physics debug raycasts collection schema
+schemas/PhysicsDebugRender.ts - Physics debug render schema
+schemas/Quaternion.ts - Quaternion schema
+schemas/RgbColor.ts - RGB color schema
+schemas/SceneUI.ts - Scene UI schema
+schemas/SceneUIs.ts - Scene UIs collection schema
+schemas/StateRequest.ts - State request schema
+schemas/SyncRequest.ts - Sync request schema
+schemas/SyncResponse.ts - Sync response schema
+schemas/UI.ts - UI schema
+schemas/UIData.ts - UI data schema
+schemas/UIDatas.ts - UI datas collection schema
+schemas/Vector.ts - Vector schema
+schemas/VectorBoolean.ts - Vector boolean schema
+schemas/World.ts - World schema
 ```
 
 ## Assets (`assets/`)
