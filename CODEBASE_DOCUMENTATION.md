@@ -22,6 +22,7 @@ CONFIG:   package.json - Monorepo root (npm workspaces)
           server/eslint.config.js - ESLint + tsdoc
           client/vite.config.js - Vite dev server + basis transcoder copy
           protocol/package.json - Protocol package
+BENCH:    MAP_COMPRESSION_BENCHMARK.md - Benchmark results + comparison for native compressed world maps
 ```
 
 ## Server (`server/src/`)
