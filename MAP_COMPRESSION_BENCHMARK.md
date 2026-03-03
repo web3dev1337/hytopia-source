@@ -119,6 +119,18 @@ Run used: `--skip-entities --iterations 3`
 
 Repo: `https://github.com/web3dev1337/hytopia-map-compression`
 
+### Feature matrix (high level)
+
+| Capability | Native SDK (this PR) | `hytopia-map-compression` |
+|---|---:|---:|
+| Load legacy `WorldMap` JSON | ✅ | ✅ |
+| Load compressed map object | ✅ (auto-detect in `World.loadMap`) | ✅ (plugin loader) |
+| Preserve rotated blocks (`{ i, r }`) | ✅ | ❌ (blocks assumed numeric IDs) |
+| Streaming decode (avoid materializing `{ "x,y,z": ... }`) | ✅ | ❌ (unless using chunk caches) |
+| Precomputed chunk caches (`.chunks`, `.chunks.bin`) | ❌ | ✅ |
+| Hash-based disk cache invalidation | ❌ | ✅ |
+| Avoid private-field writes / monkey patching | ✅ | ❌ (for fastest path) |
+
 ### What matches (core compression)
 
 Both implementations use essentially the same “HyFire-style” core encoding:
@@ -160,4 +172,3 @@ Native compressed maps give:
 - **Huge disk/transfer win** (e.g., 30MB → ~1MB),
 - **Lower parse cost** (hundreds of ms → ~0.1ms),
 - **Moderate `loadMap(...)` speedup** (~1.2–1.3× on multi‑million‑block maps) while keeping full physics/collider correctness and backward compatibility.
-
