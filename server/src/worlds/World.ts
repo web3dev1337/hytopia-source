@@ -12,11 +12,13 @@ import SceneUIManager from '@/worlds/ui/SceneUIManager';
 import Serializer from '@/networking/Serializer';
 import Simulation from '@/worlds/physics/Simulation';
 import WorldLoop from '@/worlds/WorldLoop';
+import WorldMapCodec from '@/worlds/maps/WorldMapCodec';
 import { BLOCK_ROTATIONS } from '@/worlds/blocks/Block';
 import type { BlockTypeOptions } from '@/worlds/blocks/BlockType';
 import type { EntityOptions } from '@/worlds/entities/Entity';
 import type RgbColor from '@/shared/types/RgbColor';
 import type Vector3Like from '@/shared/types/math/Vector3Like';
+import type { CompressedWorldMap } from '@/worlds/maps/WorldMapCodec';
 
 /**
  * A map representation for initializing a world.
@@ -95,7 +97,7 @@ export interface WorldOptions {
   fogNear?: number;
 
   /** The map of the world. */
-  map?: WorldMap;
+  map?: WorldMap | CompressedWorldMap;
 
   /** The name of the world. */
   name: string;
@@ -506,9 +508,50 @@ export default class World extends EventRouter implements protocol.Serializable 
    *
    * **Category:** Core
    */
-  public loadMap(map: WorldMap) {
+  public loadMap(map: WorldMap | CompressedWorldMap) {
     // Clear any prior map
     this.chunkLattice.clear();
+
+    if (WorldMapCodec.isCompressedWorldMap(map)) {
+      const blockTypes = map.blockTypes
+        ? (Array.isArray(map.blockTypes) ? map.blockTypes : Object.values(map.blockTypes))
+        : undefined;
+
+      if (blockTypes) {
+        for (const blockTypeData of blockTypes) {
+          this.blockTypeRegistry.registerGenericBlockType({
+            id: blockTypeData.id,
+            isLiquid: blockTypeData.isLiquid,
+            lightLevel: blockTypeData.lightLevel,
+            name: blockTypeData.name,
+            textureUri: blockTypeData.textureUri,
+            customColliderOptions: blockTypeData.customColliderOptions,
+          });
+        }
+      }
+
+      this.chunkLattice.initializeBlockEntries(WorldMapCodec.decodeBlockEntries(map));
+
+      if (map.entities) {
+        for (const key in map.entities) {
+          const entityOptions = map.entities[key];
+          const i1 = key.indexOf(',');
+          const i2 = key.indexOf(',', i1 + 1);
+          const x = Number(key.slice(0, i1));
+          const y = Number(key.slice(i1 + 1, i2));
+          const z = Number(key.slice(i2 + 1));
+
+          const entity = new Entity({
+            isEnvironmental: true,
+            ...entityOptions,
+          });
+
+          entity.spawn(this, { x, y, z });
+        }
+      }
+
+      return;
+    }
 
     // Rotations LUT
     const BLOCK_ROTATIONS_BY_INDEX = Object.values(BLOCK_ROTATIONS).sort((a, b) => a.enumIndex - b.enumIndex);

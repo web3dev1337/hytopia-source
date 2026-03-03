@@ -64,6 +64,7 @@ players/PlayerUI.ts - Per-player HTML/CSS overlay UI
 worlds/World.ts - Contains ChunkLattice, EntityManager, Simulation, NetworkSynchronizer, etc.
 worlds/WorldLoop.ts - Fixed 60 Hz game loop: entity logic → physics → events → network sync
 worlds/WorldManager.ts - Multi-world support, default world creation
+worlds/maps/WorldMapCodec.ts - WorldMap <-> compressed WorldMap conversion utilities
 ```
 
 ### Blocks / Chunks

@@ -182,6 +182,10 @@ export { default as WebServer, WebServerEvent } from '@/networking/WebServer';
 export { default as World, WorldEvent } from '@/worlds/World';
 export type { WorldEventPayloads, WorldMap, WorldOptions } from '@/worlds/World';
 
+// WorldMapCodec
+export { default as WorldMapCodec } from '@/worlds/maps/WorldMapCodec';
+export type { CompressedWorldMap, CompressWorldMapOptions, CompressedWorldMapAlgorithm } from '@/worlds/maps/WorldMapCodec';
+
 // WorldLoop
 export { default as WorldLoop, WorldLoopEvent } from '@/worlds/WorldLoop';
 export type { WorldLoopEventPayloads } from '@/worlds/WorldLoop';
