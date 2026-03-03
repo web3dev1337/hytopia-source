@@ -296,22 +296,17 @@ async function main(): Promise<void> {
     worldMap = parsed as WorldMap;
   }
 
-  let effectiveWorldMap: any | undefined = worldMap;
-  if (effectiveWorldMap && args.skipEntities) {
-    effectiveWorldMap = {
-      ...effectiveWorldMap,
-      entities: undefined,
-    };
-  }
-
-  if (effectiveWorldMap) {
-    const blockCount = countKeys(effectiveWorldMap.blocks);
-    const entityCount = countKeys(effectiveWorldMap.entities);
+  if (worldMap) {
+    const blockCount = countKeys(worldMap.blocks);
+    const originalEntityCount = countKeys(worldMap?.entities);
+    const entityCountLabel = args.skipEntities && originalEntityCount > 0
+      ? `${originalEntityCount.toLocaleString()} (skipped)`
+      : `${originalEntityCount.toLocaleString()}`;
     // eslint-disable-next-line no-console
-    console.log(`worldMap: blocks=${blockCount.toLocaleString()} blockTypes=${effectiveWorldMap.blockTypes?.length ?? 0} entities=${entityCount.toLocaleString()}`);
+    console.log(`worldMap: blocks=${blockCount.toLocaleString()} blockTypes=${worldMap.blockTypes?.length ?? 0} entities=${entityCountLabel}`);
 
     const compressStart = process.hrtime.bigint();
-    compressedMap = WorldMapCodec.compress(effectiveWorldMap, { algorithm: args.algorithm, level: args.level });
+    compressedMap = WorldMapCodec.compress(worldMap, { algorithm: args.algorithm, level: args.level });
     const compressEnd = process.hrtime.bigint();
 
     const compressedJson = JSON.stringify(compressedMap);
@@ -334,27 +329,29 @@ async function main(): Promise<void> {
     throw new Error('Failed to resolve compressed map input.');
   }
 
-  const effectiveCompressedMap: any = args.skipEntities
-    ? { ...compressedMap, entities: undefined }
-    : compressedMap;
-
-  if (effectiveCompressedMap) {
-    const entityCount = countKeys(effectiveCompressedMap.entities);
-    const blockTypesCount = effectiveCompressedMap.blockTypes
-      ? (Array.isArray(effectiveCompressedMap.blockTypes) ? effectiveCompressedMap.blockTypes.length : Object.keys(effectiveCompressedMap.blockTypes).length)
+  {
+    const originalEntityCount = countKeys(compressedMap.entities);
+    const entityCountLabel = args.skipEntities && originalEntityCount > 0
+      ? `${originalEntityCount.toLocaleString()} (skipped)`
+      : `${originalEntityCount.toLocaleString()}`;
+    const blockTypesCount = compressedMap.blockTypes
+      ? (Array.isArray(compressedMap.blockTypes) ? compressedMap.blockTypes.length : Object.keys(compressedMap.blockTypes).length)
       : 0;
 
     // eslint-disable-next-line no-console
-    console.log(`compressedMap: algorithm=${effectiveCompressedMap.algorithm ?? 'brotli'} rotations=${effectiveCompressedMap.options?.rotations === true} blockTypes=${blockTypesCount} entities=${entityCount.toLocaleString()}`);
+    console.log(`compressedMap: algorithm=${compressedMap.algorithm ?? 'brotli'} rotations=${compressedMap.options?.rotations === true} blockTypes=${blockTypesCount} entities=${entityCountLabel}`);
   }
 
-  if (effectiveWorldMap) {
+  const worldMapForLoad = worldMap && args.skipEntities ? { ...worldMap, entities: undefined } : worldMap;
+  const compressedMapForLoad = args.skipEntities ? { ...compressedMap, entities: undefined } : compressedMap;
+
+  if (worldMapForLoad) {
     const jsonBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
     if (jsonBenchWarmup > 0) {
-      benchLoadMap(World, effectiveWorldMap, jsonBenchWarmup);
+      benchLoadMap(World, worldMapForLoad, jsonBenchWarmup);
     }
 
-    const jsonBench = benchLoadMap(World, effectiveWorldMap, args.iterations);
+    const jsonBench = benchLoadMap(World, worldMapForLoad, args.iterations);
     const jsonMedian = median(jsonBench.timesMs);
     // eslint-disable-next-line no-console
     console.log(`loadMap WorldMap: median=${formatMs(jsonMedian)} min=${formatMs(Math.min(...jsonBench.timesMs))} max=${formatMs(Math.max(...jsonBench.timesMs))} runs=${args.iterations}`);
@@ -362,23 +359,23 @@ async function main(): Promise<void> {
 
   const compressedBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
   if (compressedBenchWarmup > 0) {
-    benchLoadMap(World, effectiveCompressedMap, compressedBenchWarmup);
+    benchLoadMap(World, compressedMapForLoad, compressedBenchWarmup);
   }
-  const compressedBench = benchLoadMap(World, effectiveCompressedMap, args.iterations);
+  const compressedBench = benchLoadMap(World, compressedMapForLoad, args.iterations);
   const compressedMedian = median(compressedBench.timesMs);
   // eslint-disable-next-line no-console
   console.log(`loadMap CompressedWorldMap: median=${formatMs(compressedMedian)} min=${formatMs(Math.min(...compressedBench.timesMs))} max=${formatMs(Math.max(...compressedBench.timesMs))} runs=${args.iterations}`);
 
-  if (args.validate && effectiveWorldMap) {
+  if (args.validate && worldMapForLoad) {
     // eslint-disable-next-line no-console
     console.log('validate: hashing chunk lattice...');
 
     const a = createBenchWorld(World);
-    a.loadMap(effectiveWorldMap);
+    a.loadMap(worldMapForLoad);
     const aHash = hashChunkLattice(a);
 
     const b = createBenchWorld(World);
-    b.loadMap(effectiveCompressedMap);
+    b.loadMap(compressedMapForLoad);
     const bHash = hashChunkLattice(b);
 
     const ok = aHash.hash === bHash.hash;
