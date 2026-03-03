@@ -67,6 +67,12 @@ worlds/WorldManager.ts - Multi-world support, default world creation
 worlds/maps/WorldMapCodec.ts - WorldMap <-> compressed WorldMap conversion utilities
 ```
 
+### Scripts (`server/scripts/`)
+
+```
+scripts/worldmap-benchmark.ts - Bench + validate WorldMap vs compressed WorldMap loadMap performance
+```
+
 ### Blocks / Chunks
 
 ```
