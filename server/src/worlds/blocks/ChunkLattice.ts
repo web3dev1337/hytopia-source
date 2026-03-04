@@ -1,4 +1,4 @@
-import Chunk, { CHUNK_VOLUME, MAX_BLOCK_TYPE_ID } from '@/worlds/blocks/Chunk';
+import Chunk, { CHUNK_SIZE, CHUNK_VOLUME, MAX_BLOCK_TYPE_ID } from '@/worlds/blocks/Chunk';
 import EventRouter from '@/events/EventRouter';
 import RigidBody, { RigidBodyType } from '../physics/RigidBody';
 import { BLOCK_ROTATIONS } from '@/worlds/blocks/Block';
@@ -408,8 +408,26 @@ export default class ChunkLattice extends EventRouter {
       this._rigidBody.addToSimulation(this._world.simulation);
     }
 
+    const blockPlacementsByType: Map<number, BlockPlacement[]> = new Map();
+
     for (const chunkData of chunks) {
+      if (!Number.isInteger(chunkData.originCoordinate.x) ||
+          !Number.isInteger(chunkData.originCoordinate.y) ||
+          !Number.isInteger(chunkData.originCoordinate.z)) {
+        ErrorHandler.fatalError('ChunkLattice.initializeChunkCacheChunks(): Chunk origin is not an integer coordinate.');
+      }
+
+      if ((Math.trunc(chunkData.originCoordinate.x) % CHUNK_SIZE) !== 0 ||
+          (Math.trunc(chunkData.originCoordinate.y) % CHUNK_SIZE) !== 0 ||
+          (Math.trunc(chunkData.originCoordinate.z) % CHUNK_SIZE) !== 0) {
+        ErrorHandler.fatalError('ChunkLattice.initializeChunkCacheChunks(): Chunk origin is not aligned to CHUNK_SIZE.');
+      }
+
       const chunkKey = this._packCoordinate(chunkData.originCoordinate);
+      if (this._chunks.has(chunkKey)) {
+        ErrorHandler.fatalError('ChunkLattice.initializeChunkCacheChunks(): Duplicate chunk origin encountered in chunk cache.');
+      }
+
       const chunk = new Chunk(chunkData.originCoordinate);
       chunk.initializeRaw(chunkData.blocks, chunkData.blockRotations);
       this._chunks.set(chunkKey, chunk);
@@ -420,6 +438,7 @@ export default class ChunkLattice extends EventRouter {
       });
 
       const blocks = chunkData.blocks;
+      const origin = chunkData.originCoordinate;
       for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
         const blockTypeId = blocks[blockIndex];
         if (blockTypeId === 0) continue;
@@ -445,6 +464,24 @@ export default class ChunkLattice extends EventRouter {
 
         chunkMask[wordIndex] |= bitMask;
         this._blockTypeCounts.set(blockTypeId, (this._blockTypeCounts.get(blockTypeId) ?? 0) + 1);
+
+        let placements = blockPlacementsByType.get(blockTypeId);
+        if (!placements) {
+          placements = [];
+          blockPlacementsByType.set(blockTypeId, placements);
+        }
+
+        const localCoordinate = Chunk.blockIndexToLocalCoordinate(blockIndex);
+        const blockRotation = chunkData.blockRotations.get(blockIndex);
+
+        placements.push({
+          globalCoordinate: {
+            x: origin.x + localCoordinate.x,
+            y: origin.y + localCoordinate.y,
+            z: origin.z + localCoordinate.z,
+          },
+          blockRotation,
+        });
       }
     }
 
@@ -454,7 +491,7 @@ export default class ChunkLattice extends EventRouter {
         continue;
       }
 
-      const blockPlacements = this._getBlockTypePlacements(blockTypeId);
+      const blockPlacements = blockPlacementsByType.get(blockTypeId) ?? this._getBlockTypePlacements(blockTypeId);
       const collider = this.getOrCreateBlockTypeCollider(blockTypeId, blockPlacements);
       const blockType = this._world.blockTypeRegistry.getBlockType(blockTypeId);
 
