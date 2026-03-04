@@ -516,93 +516,10 @@ export default class World extends EventRouter implements protocol.Serializable 
   ) {
     const spawnEntities = options.spawnEntities ?? true;
 
-    if (WorldMapCodec.isCompressedWorldMap(map)) {
-      const blockTypes = map.blockTypes
-        ? (Array.isArray(map.blockTypes) ? map.blockTypes : Object.values(map.blockTypes))
-        : undefined;
-
-      if (blockTypes) {
-        for (const blockTypeData of blockTypes) {
-          this.blockTypeRegistry.registerGenericBlockType({
-            id: blockTypeData.id,
-            isLiquid: blockTypeData.isLiquid,
-            lightLevel: blockTypeData.lightLevel,
-            name: blockTypeData.name,
-            textureUri: blockTypeData.textureUri,
-            customColliderOptions: blockTypeData.customColliderOptions,
-          });
-        }
-      }
-
-      this.chunkLattice.initializeBlockEntries(WorldMapCodec.decodeBlockEntries(map));
-
-      if (spawnEntities && map.entities) {
-        for (const key in map.entities) {
-          const entityOptions = map.entities[key];
-          const i1 = key.indexOf(',');
-          const i2 = key.indexOf(',', i1 + 1);
-          const x = Number(key.slice(0, i1));
-          const y = Number(key.slice(i1 + 1, i2));
-          const z = Number(key.slice(i2 + 1));
-
-          const entity = new Entity({
-            isEnvironmental: true,
-            ...entityOptions,
-          });
-
-          entity.spawn(this, { x, y, z });
-        }
-      }
-
-      return;
-    }
-
-    if (WorldMapChunkCacheCodec.isWorldMapChunkCache(map)) {
-      const { metadata, chunks } = WorldMapChunkCacheCodec.decode(map);
-
-      const blockTypes = metadata.blockTypes;
-      if (blockTypes) {
-        for (const blockTypeData of blockTypes) {
-          this.blockTypeRegistry.registerGenericBlockType({
-            id: blockTypeData.id,
-            isLiquid: blockTypeData.isLiquid,
-            lightLevel: blockTypeData.lightLevel,
-            name: blockTypeData.name,
-            textureUri: blockTypeData.textureUri,
-            customColliderOptions: blockTypeData.customColliderOptions,
-          });
-        }
-      }
-
-      this.chunkLattice.initializeChunkCacheChunks(chunks);
-
-      if (spawnEntities && metadata.entities) {
-        for (const key in metadata.entities) {
-          const entityOptions = metadata.entities[key];
-          const i1 = key.indexOf(',');
-          const i2 = key.indexOf(',', i1 + 1);
-          const x = Number(key.slice(0, i1));
-          const y = Number(key.slice(i1 + 1, i2));
-          const z = Number(key.slice(i2 + 1));
-
-          const entity = new Entity({
-            isEnvironmental: true,
-            ...entityOptions,
-          });
-
-          entity.spawn(this, { x, y, z });
-        }
-      }
-
-      return;
-    }
-
-    // Rotations LUT
-    const BLOCK_ROTATIONS_BY_INDEX = Object.values(BLOCK_ROTATIONS).sort((a, b) => a.enumIndex - b.enumIndex);
-
-    // load map block types
-    if (map.blockTypes) {
-      for (const blockTypeData of map.blockTypes) {
+    const registerMapBlockTypes = (blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>) => {
+      if (!blockTypes) return;
+      const list = Array.isArray(blockTypes) ? blockTypes : Object.values(blockTypes);
+      for (const blockTypeData of list) {
         this.blockTypeRegistry.registerGenericBlockType({
           id: blockTypeData.id,
           isLiquid: blockTypeData.isLiquid,
@@ -612,6 +529,55 @@ export default class World extends EventRouter implements protocol.Serializable 
           customColliderOptions: blockTypeData.customColliderOptions,
         });
       }
+    };
+
+    const spawnMapEntities = (entities?: WorldMap['entities']) => {
+      if (!spawnEntities || !entities) return;
+      for (const key in entities) {
+        const entityOptions = entities[key];
+        const i1 = key.indexOf(',');
+        const i2 = key.indexOf(',', i1 + 1);
+        const x = Number(key.slice(0, i1));
+        const y = Number(key.slice(i1 + 1, i2));
+        const z = Number(key.slice(i2 + 1));
+
+        const entity = new Entity({
+          isEnvironmental: true,
+          ...entityOptions,
+        });
+
+        entity.spawn(this, { x, y, z });
+      }
+    };
+
+    if (WorldMapCodec.isCompressedWorldMap(map)) {
+      registerMapBlockTypes(map.blockTypes);
+
+      this.chunkLattice.initializeBlockEntries(WorldMapCodec.decodeBlockEntries(map));
+
+      spawnMapEntities(map.entities);
+
+      return;
+    }
+
+    if (WorldMapChunkCacheCodec.isWorldMapChunkCache(map)) {
+      const { metadata, chunks } = WorldMapChunkCacheCodec.decode(map);
+
+      registerMapBlockTypes(metadata.blockTypes);
+
+      this.chunkLattice.initializeChunkCacheChunks(chunks);
+
+      spawnMapEntities(metadata.entities);
+
+      return;
+    }
+
+    // Rotations LUT
+    const BLOCK_ROTATIONS_BY_INDEX = Object.values(BLOCK_ROTATIONS).sort((a, b) => a.enumIndex - b.enumIndex);
+
+    // load map block types
+    if (map.blockTypes) {
+      registerMapBlockTypes(map.blockTypes);
     }
 
     // load map chunk blocks
@@ -639,23 +605,7 @@ export default class World extends EventRouter implements protocol.Serializable 
     this.chunkLattice.initializeBlockEntries(blockEntries());
 
     // load map entities
-    if (spawnEntities && map.entities) {
-      for (const key in map.entities) {
-        const entityOptions = map.entities[key];
-        const i1 = key.indexOf(',');
-        const i2 = key.indexOf(',', i1 + 1);
-        const x = Number(key.slice(0, i1));
-        const y = Number(key.slice(i1 + 1, i2));
-        const z = Number(key.slice(i2 + 1));
-
-        const entity = new Entity({
-          isEnvironmental: true,
-          ...entityOptions,
-        });
-
-        entity.spawn(this, { x, y, z });
-      }
-    }
+    spawnMapEntities(map.entities);
   }
 
   /**
