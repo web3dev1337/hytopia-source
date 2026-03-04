@@ -42,18 +42,22 @@ import type { NetworkManagerEventPayload } from '../network/NetworkManager';
 import { type ClientSettingsEventPayload, ClientSettingsEventType } from '../settings/SettingsManager';
 
 const MISSING_SKYBOX_TEXTURE_PATH = '/textures/missing-skybox';
-const IOS_MAX_RENDER_PIXEL_RATIO = 1.5;
-const OTHER_MOBILE_MAX_RENDER_PIXEL_RATIO = 2.0;
+const SAFE_PIXEL_RATIO_IOS = 1.5;
+const SAFE_PIXEL_RATIO_MOBILE = 2.0;
 
-const isIOSOrIPadOS = (): boolean => {
-  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
-    return true;
-  }
+const isAppleMobileDevice = (): boolean => {
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
 
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 };
 
-const MAX_MOBILE_DPR = isIOSOrIPadOS() ? IOS_MAX_RENDER_PIXEL_RATIO : OTHER_MOBILE_MAX_RENDER_PIXEL_RATIO;
+const safeDevicePixelRatio = (nativeRatio: number): number => {
+  if (!MobileManager.isMobile) return nativeRatio;
+
+  const gpuSafeMax = isAppleMobileDevice() ? SAFE_PIXEL_RATIO_IOS : SAFE_PIXEL_RATIO_MOBILE;
+
+  return Math.min(nativeRatio, gpuSafeMax);
+};
 
 // Working variables
 const color = new Color();
@@ -505,10 +509,7 @@ export default class Renderer {
   private _onClientSettingsUpdate = (_payload: ClientSettingsEventPayload.IUpdate): void => {
     const { resolution } = this._game.settingsManager.qualityPerfTradeoff;
 
-    const devicePixelRatio = MobileManager.isMobile
-      ? Math.min(window.devicePixelRatio, MAX_MOBILE_DPR)
-      : window.devicePixelRatio;
-    this._renderer.setPixelRatio(devicePixelRatio * resolution.multiplier);
+    this._renderer.setPixelRatio(safeDevicePixelRatio(window.devicePixelRatio) * resolution.multiplier);
 
     this._clampTargetFogNearAndFar();
     this._setupFog();
@@ -607,10 +608,7 @@ export default class Renderer {
   private _setupRenderer(): void {
     this._renderer.setSize(document.documentElement.clientWidth, document.documentElement.clientHeight);
     const resolutionMultiplier = this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier;
-    const devicePixelRatio = MobileManager.isMobile
-      ? Math.min(window.devicePixelRatio, MAX_MOBILE_DPR)
-      : window.devicePixelRatio;
-    this._renderer.setPixelRatio(devicePixelRatio * resolutionMultiplier);
+    this._renderer.setPixelRatio(safeDevicePixelRatio(window.devicePixelRatio) * resolutionMultiplier);
     this._renderer.info.autoReset = false;
     this._renderer.localClippingEnabled = false;
     // Be explicit about output space; this is cheap and avoids surprises across Three.js versions.
