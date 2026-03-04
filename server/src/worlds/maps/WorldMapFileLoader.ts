@@ -9,6 +9,9 @@ import type { WorldMapChunkCache } from '@/worlds/maps/WorldMapChunkCacheCodec';
 
 export type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
 
+const CHUNK_CACHE_MAGIC = Buffer.from('HYTCHUNK');
+const CHUNK_CACHE_VERSION = 1;
+
 export default class WorldMapFileLoader {
   public static load(mapPath: string, options: { preferChunkCache?: boolean } = {}): AnyWorldMap {
     const preferChunkCache = options.preferChunkCache ?? true;
@@ -22,7 +25,13 @@ export default class WorldMapFileLoader {
       if (fs.existsSync(chunkCachePath)) {
         const raw = fs.readFileSync(chunkCachePath);
 
-        return { data: raw.toString('base64') };
+        const looksValid = raw.byteLength >= 12 &&
+          raw.subarray(0, 8).equals(CHUNK_CACHE_MAGIC) &&
+          raw.readUInt8(8) === CHUNK_CACHE_VERSION;
+
+        if (looksValid) {
+          return { data: raw.toString('base64') };
+        }
       }
     }
 
