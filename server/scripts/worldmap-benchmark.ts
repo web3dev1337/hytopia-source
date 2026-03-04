@@ -15,6 +15,7 @@ type Args = {
   cacheLevel: number;
   iterations: number;
   validate: boolean;
+  benchE2e: boolean;
   preloadModels: boolean;
   skipEntities: boolean;
   outPath?: string;
@@ -37,6 +38,7 @@ function usage(exitCode: number): never {
     '  --cache-level <0-11>     Chunk cache compression level (default: 4)',
     '  --iterations <n>         Number of load iterations per format (default: 3)',
     '  --validate               Hash chunk lattice after load',
+    '  --bench-e2e              Benchmark read+parse+load for each format',
     '  --preload-models         Preload all models before running',
     '  --skip-entities          Do not spawn map entities during load',
     '  --out <path>             Write compressed map JSON (when input is WorldMap)',
@@ -63,6 +65,7 @@ function parseArgs(argv: string[]): Args {
   let cacheLevel = 4;
   let iterations = 3;
   let validate = false;
+  let benchE2e = false;
   let preloadModels = false;
   let skipEntities = false;
   let outPath: string | undefined;
@@ -133,6 +136,11 @@ function parseArgs(argv: string[]): Args {
       continue;
     }
 
+    if (arg === '--bench-e2e') {
+      benchE2e = true;
+      continue;
+    }
+
     if (arg === '--preload-models') {
       preloadModels = true;
       continue;
@@ -172,6 +180,7 @@ function parseArgs(argv: string[]): Args {
     cacheLevel,
     iterations,
     validate,
+    benchE2e,
     preloadModels,
     skipEntities,
     outPath,
@@ -197,6 +206,41 @@ function formatBytes(bytes: number): string {
   if (mb < 1024) return `${mb.toFixed(2)}MB`;
   const gb = mb / 1024;
   return `${gb.toFixed(2)}GB`;
+}
+
+function readTextFileTimed(filePath: string): { text: string, ms: number, bytes: number } {
+  const start = process.hrtime.bigint();
+  const text = fs.readFileSync(filePath, 'utf-8');
+  const end = process.hrtime.bigint();
+
+  return {
+    text,
+    ms: hrtimeMs(start, end),
+    bytes: Buffer.byteLength(text),
+  };
+}
+
+function readBinaryFileTimed(filePath: string): { buffer: Buffer, ms: number, bytes: number } {
+  const start = process.hrtime.bigint();
+  const buffer = fs.readFileSync(filePath);
+  const end = process.hrtime.bigint();
+
+  return {
+    buffer,
+    ms: hrtimeMs(start, end),
+    bytes: buffer.byteLength,
+  };
+}
+
+function parseJsonTimed(text: string): { value: unknown, ms: number } {
+  const start = process.hrtime.bigint();
+  const value = JSON.parse(text) as unknown;
+  const end = process.hrtime.bigint();
+
+  return {
+    value,
+    ms: hrtimeMs(start, end),
+  };
 }
 
 function median(values: number[]): number {
@@ -333,27 +377,27 @@ async function main(): Promise<void> {
   const isChunkCacheBinary = absoluteMapPath.endsWith('.chunks.bin');
 
   let parsed: unknown;
+  let inputReadMs = 0;
+  let inputParseMs = 0;
   if (isChunkCacheBinary) {
-    const readStart = process.hrtime.bigint();
-    const rawBin = fs.readFileSync(absoluteMapPath);
-    const readEnd = process.hrtime.bigint();
+    const { buffer, ms } = readBinaryFileTimed(absoluteMapPath);
+    inputReadMs = ms;
     // eslint-disable-next-line no-console
-    console.log(`read: ${formatMs(hrtimeMs(readStart, readEnd))}`);
+    console.log(`read: ${formatMs(ms)}`);
     // eslint-disable-next-line no-console
     console.log('parse: (binary)');
-    parsed = { data: rawBin.toString('base64') };
+    parsed = { data: buffer.toString('base64') };
   } else {
-    const readStart = process.hrtime.bigint();
-    const raw = fs.readFileSync(absoluteMapPath, 'utf-8');
-    const readEnd = process.hrtime.bigint();
+    const { text, ms } = readTextFileTimed(absoluteMapPath);
+    inputReadMs = ms;
     // eslint-disable-next-line no-console
-    console.log(`read: ${formatMs(hrtimeMs(readStart, readEnd))}`);
+    console.log(`read: ${formatMs(ms)}`);
 
-    const parseStart = process.hrtime.bigint();
-    parsed = JSON.parse(raw) as unknown;
-    const parseEnd = process.hrtime.bigint();
+    const parsedTimed = parseJsonTimed(text);
+    parsed = parsedTimed.value;
+    inputParseMs = parsedTimed.ms;
     // eslint-disable-next-line no-console
-    console.log(`parse: ${formatMs(hrtimeMs(parseStart, parseEnd))}`);
+    console.log(`parse: ${formatMs(parsedTimed.ms)}`);
   }
 
   let worldMap: any | undefined;
@@ -416,6 +460,10 @@ async function main(): Promise<void> {
     console.log(`compressedMap: algorithm=${compressedMap.algorithm ?? 'brotli'} rotations=${compressedMap.options?.rotations === true} blockTypes=${blockTypesCount} entities=${entityCountLabel}`);
   }
 
+  // Size accounting: the chunk cache is typically shipped alongside a canonical map JSON.
+  // eslint-disable-next-line no-console
+  console.log(`sizes: input=${formatBytes(mapFileSize)}`);
+
   if (worldMap) {
     const jsonBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
     if (jsonBenchWarmup > 0) {
@@ -451,6 +499,10 @@ async function main(): Promise<void> {
   }
 
   if (chunkCache) {
+    const chunkCacheBytes = Buffer.from(chunkCache.data, 'base64').byteLength;
+    // eslint-disable-next-line no-console
+    console.log(`sizes: chunkCache=${formatBytes(chunkCacheBytes)}`);
+
     if (args.chunkCacheOutPath) {
       const out = path.resolve(process.cwd(), args.chunkCacheOutPath);
       fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -469,6 +521,63 @@ async function main(): Promise<void> {
       // eslint-disable-next-line no-console
       console.log(`loadMap WorldMapChunkCache: median=${formatMs(chunkCacheMedian)} min=${formatMs(Math.min(...chunkCacheBench.timesMs))} max=${formatMs(Math.max(...chunkCacheBench.timesMs))} runs=${args.iterations}`);
     }
+  }
+
+  if (args.benchE2e) {
+    // eslint-disable-next-line no-console
+    console.log('e2e: read+parse+load (1 run each)');
+
+    const e2eLoad = (label: string, readMs: number, parseMs: number, mapObj: any): void => {
+      const world = createBenchWorld(World);
+      const loadStart = process.hrtime.bigint();
+      world.loadMap(mapObj, loadOptions);
+      const loadEnd = process.hrtime.bigint();
+      const loadMs = hrtimeMs(loadStart, loadEnd);
+      const totalMs = readMs + parseMs + loadMs;
+
+      // eslint-disable-next-line no-console
+      console.log(`e2e ${label}: read=${formatMs(readMs)} parse=${parseMs === 0 ? '(none)' : formatMs(parseMs)} loadMap=${formatMs(loadMs)} total=${formatMs(totalMs)}`);
+    };
+
+    if (worldMap) {
+      e2eLoad('WorldMap', inputReadMs, inputParseMs, worldMap);
+    }
+
+    if (compressedMap) {
+      if (args.outPath) {
+        const out = path.resolve(process.cwd(), args.outPath);
+        if (fs.existsSync(out)) {
+          const { text, ms: readMs } = readTextFileTimed(out);
+          const parsedTimed = parseJsonTimed(text);
+          e2eLoad('CompressedWorldMap(file)', readMs, parsedTimed.ms, parsedTimed.value);
+        }
+      } else {
+        const stringifyStart = process.hrtime.bigint();
+        const json = JSON.stringify(compressedMap);
+        const stringifyEnd = process.hrtime.bigint();
+        const parseTimed = parseJsonTimed(json);
+        const stringifyMs = hrtimeMs(stringifyStart, stringifyEnd);
+        // eslint-disable-next-line no-console
+        console.log(`e2e CompressedWorldMap(in-memory): stringify=${formatMs(stringifyMs)} parse=${formatMs(parseTimed.ms)} (no disk read)`);
+        e2eLoad('CompressedWorldMap(in-memory)', 0, stringifyMs + parseTimed.ms, parseTimed.value);
+      }
+    }
+
+    if (chunkCache) {
+      if (args.chunkCacheOutPath) {
+        const out = path.resolve(process.cwd(), args.chunkCacheOutPath);
+        if (fs.existsSync(out)) {
+          const { buffer, ms: readMs } = readBinaryFileTimed(out);
+          e2eLoad('WorldMapChunkCache(file)', readMs, 0, { data: buffer.toString('base64') });
+        }
+      } else {
+        e2eLoad('WorldMapChunkCache(in-memory)', 0, 0, chunkCache);
+      }
+    }
+
+    const coldInitMs = hrtimeMs(initStart, initEnd);
+    // eslint-disable-next-line no-console
+    console.log(`e2e cold-start note: init=${formatMs(coldInitMs)} (add to totals for first boot)`);
   }
 
   if (args.validate) {
