@@ -5,7 +5,7 @@
 ```ts
 
 import type { AnyPacket } from '@hytopia.com/server-protocol';
-import type { ErrorEvent } from 'ws';
+import type { ErrorEvent as ErrorEvent_2 } from 'ws';
 import EventEmitter from 'eventemitter3';
 import http from 'http';
 import type { InputSchema } from '@hytopia.com/server-protocol';
@@ -17,9 +17,6 @@ import * as Sentry from '@sentry/node';
 import type { Socket } from 'net';
 import { WebSocket as WebSocket_2 } from 'ws';
 import type { WebTransportSessionImpl } from '@fails-components/webtransport/dist/lib/types';
-
-// @public (undocumented)
-export type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
 
 // @public
 export class AssetsLibrary {
@@ -569,8 +566,6 @@ export class Chunk implements protocol.Serializable {
     static globalCoordinateToLocalCoordinate(globalCoordinate: Vector3Like): Vector3Like;
     static globalCoordinateToOriginCoordinate(globalCoordinate: Vector3Like): Vector3Like;
     hasBlock(localCoordinate: Vector3Like): boolean;
-    // @internal (undocumented)
-    initializeRaw(blocks: Uint8Array, blockRotations?: Map<number, BlockRotation>): void;
     // @internal
     static localCoordinateToBlockIndex(localCoordinate: Vector3Like): number;
     get originCoordinate(): Vector3Like;
@@ -604,12 +599,6 @@ export class ChunkLattice extends EventRouter {
     initializeBlocks(blocks: {
         [blockTypeId: number]: BlockPlacement[];
     }): void;
-    // @internal (undocumented)
-    initializeChunkCacheChunks(chunks: Iterable<{
-        originCoordinate: Vector3Like;
-        blocks: Uint8Array;
-        blockRotations: Map<number, BlockRotation>;
-    }>): void;
     setBlock(globalCoordinate: Vector3Like, blockTypeId: number, blockRotation?: BlockRotation): void;
 }
 
@@ -850,49 +839,6 @@ export type CollisionObject = BlockType | Entity | CollisionCallback;
 // @public
 export type CommandCallback = (player: Player, args: string[], message: string) => void;
 
-// @public (undocumented)
-export interface CompressedWorldMap {
-    // (undocumented)
-    algorithm?: CompressedWorldMapAlgorithm;
-    // (undocumented)
-    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
-    // Warning: (ae-forgotten-export) The symbol "CompressedWorldMapBounds" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    bounds: CompressedWorldMapBounds;
-    // (undocumented)
-    codecVersion?: number;
-    // (undocumented)
-    data: string;
-    // (undocumented)
-    entities?: WorldMap['entities'];
-    // (undocumented)
-    format?: 'hytopia.worldmap.compressed';
-    // (undocumented)
-    mapVersion?: unknown;
-    // (undocumented)
-    metadata?: unknown;
-    // Warning: (ae-forgotten-export) The symbol "CompressedWorldMapOptions" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    options?: CompressedWorldMapOptions;
-    // (undocumented)
-    version?: string;
-}
-
-// @public (undocumented)
-export type CompressedWorldMapAlgorithm = 'brotli' | 'gzip' | 'none';
-
-// @public (undocumented)
-export interface CompressWorldMapOptions {
-    // (undocumented)
-    algorithm?: CompressedWorldMapAlgorithm;
-    // (undocumented)
-    includeRotations?: boolean;
-    // (undocumented)
-    level?: number;
-}
-
 // @public
 export interface ConeColliderOptions extends BaseColliderOptions {
     halfHeight?: number;
@@ -916,18 +862,6 @@ export type ContactManifold = {
     localNormalB: Vector3Like;
     normal: Vector3Like;
 };
-
-// @public (undocumented)
-export interface CreateWorldMapChunkCacheOptions {
-    // (undocumented)
-    algorithm?: WorldMapChunkCacheAlgorithm;
-    // (undocumented)
-    includeRotations?: boolean;
-    // (undocumented)
-    level?: number;
-    // (undocumented)
-    sourceSha256?: string;
-}
 
 // @public
 export interface CylinderColliderOptions extends BaseColliderOptions {
@@ -3397,9 +3331,7 @@ export class World extends EventRouter implements protocol.Serializable {
     get fogFar(): number;
     get fogNear(): number;
     get id(): number;
-    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache, options?: {
-        spawnEntities?: boolean;
-    }): void;
+    loadMap(map: WorldMap): void;
     get loop(): WorldLoop;
     get name(): string;
     // Warning: (ae-forgotten-export) The symbol "NetworkSynchronizer" needs to be exported by the entry point index.d.ts
@@ -3601,113 +3533,6 @@ export interface WorldMap {
     };
 }
 
-// @public (undocumented)
-export type WorldMapArtifacts = {
-    compressedMap: CompressedWorldMap;
-    compressedMapJson: string;
-    compressedMapSha256: string;
-    chunkCache: WorldMapChunkCache;
-    chunkCacheBuffer: Buffer;
-};
-
-// @public (undocumented)
-export class WorldMapArtifactsGenerator {
-    // (undocumented)
-    static create(worldMap: WorldMap, options?: {
-        compressed?: CompressWorldMapOptions;
-        chunkCache?: Omit<CreateWorldMapChunkCacheOptions, 'sourceSha256'>;
-    }): WorldMapArtifacts;
-}
-
-// @public (undocumented)
-export interface WorldMapChunkCache {
-    // (undocumented)
-    algorithm?: WorldMapChunkCacheAlgorithm;
-    // (undocumented)
-    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
-    // (undocumented)
-    codecVersion?: number;
-    // (undocumented)
-    data: string;
-    // (undocumented)
-    entities?: WorldMap['entities'];
-    // (undocumented)
-    format?: 'hytopia.worldmap.chunk-cache';
-    // (undocumented)
-    version?: string;
-}
-
-// @public (undocumented)
-export type WorldMapChunkCacheAlgorithm = 'brotli' | 'gzip' | 'none';
-
-// @public (undocumented)
-export class WorldMapChunkCacheCodec {
-    // (undocumented)
-    static create(map: WorldMap | CompressedWorldMap, options?: CreateWorldMapChunkCacheOptions): WorldMapChunkCache;
-    // (undocumented)
-    static decode(cache: WorldMapChunkCache): {
-        metadata: WorldMapChunkCacheMetadata;
-        chunks: Iterable<ChunkCacheChunk>;
-    };
-    // (undocumented)
-    static decodeChunks(cache: WorldMapChunkCache): Iterable<ChunkCacheChunk>;
-    // (undocumented)
-    static decodeMetadata(cache: WorldMapChunkCache): WorldMapChunkCacheMetadata;
-    // (undocumented)
-    static decompressToWorldMap(cache: WorldMapChunkCache): WorldMap;
-    // (undocumented)
-    static isWorldMapChunkCache(value: unknown): value is WorldMapChunkCache;
-}
-
-// @public (undocumented)
-export interface WorldMapChunkCacheMetadata {
-    // (undocumented)
-    blockTypes?: BlockTypeOptions[];
-    // (undocumented)
-    entities?: WorldMap['entities'];
-    // (undocumented)
-    mapVersion?: unknown;
-    // (undocumented)
-    metadata?: unknown;
-    // (undocumented)
-    options?: WorldMapChunkCacheOptions;
-    // (undocumented)
-    source?: {
-        sha256?: string;
-    };
-}
-
-// @public (undocumented)
-export interface WorldMapChunkCacheOptions {
-    // (undocumented)
-    rotations?: boolean;
-}
-
-// @public (undocumented)
-export class WorldMapCodec {
-    // (undocumented)
-    static compress(map: WorldMap, options?: CompressWorldMapOptions): CompressedWorldMap;
-    // (undocumented)
-    static decodeBlockEntries(map: CompressedWorldMap): Iterable<{
-        globalCoordinate: Vector3Like;
-        blockTypeId: number;
-        blockRotation?: BlockRotation;
-    }>;
-    // (undocumented)
-    static decompressToWorldMap(map: CompressedWorldMap): WorldMap;
-    // (undocumented)
-    static isCompressedWorldMap(value: unknown): value is CompressedWorldMap;
-}
-
-// @public (undocumented)
-export class WorldMapFileLoader {
-    // (undocumented)
-    static load(mapPath: string, options?: {
-        preferChunkCache?: boolean;
-        warnings?: 'auto' | 'always' | 'never';
-    }): AnyWorldMap;
-}
-
 // @public
 export interface WorldOptions {
     ambientLightColor?: RgbColor;
@@ -3720,17 +3545,13 @@ export interface WorldOptions {
     fogNear?: number;
     gravity?: Vector3Like;
     id: number;
-    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache;
+    map?: WorldMap;
     name: string;
     skyboxIntensity?: number;
     skyboxUri: string;
     tag?: string;
     tickRate?: number;
 }
-
-// Warnings were encountered during analysis:
-//
-// src/worlds/maps/WorldMapChunkCacheCodec.ts:211:92 - (ae-forgotten-export) The symbol "ChunkCacheChunk" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

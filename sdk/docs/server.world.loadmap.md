@@ -11,9 +11,7 @@ Use for: initializing or fully resetting a world from serialized map data. Do NO
 **Signature:**
 
 ```typescript
-loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache, options?: {
-        spawnEntities?: boolean;
-    }): void;
+loadMap(map: WorldMap): void;
 ```
 
 ## Parameters
@@ -41,7 +39,7 @@ map
 
 </td><td>
 
-[WorldMap](./server.worldmap.md) \| [CompressedWorldMap](./server.compressedworldmap.md) \| [WorldMapChunkCache](./server.worldmapchunkcache.md)
+[WorldMap](./server.worldmap.md)
 
 
 </td><td>
@@ -51,22 +49,6 @@ The map to load.
 \*\*Side effects:\*\* Clears the chunk lattice, registers block types, and spawns entities.
 
 \*\*Category:\*\* Core
-
-
-</td></tr>
-<tr><td>
-
-options
-
-
-</td><td>
-
-{ spawnEntities?: boolean; }
-
-
-</td><td>
-
-_(Optional)_
 
 
 </td></tr>
