@@ -460,13 +460,23 @@ export default class ModelRegistry {
       const trimesh = await this._buildTrimesh(document);
       const optimizedModelData: { [key: string]: { meshCount: number } } = {};
       const io = new NodeIO().registerExtensions(MODEL_EXTENSIONS);
+      const meshCountFallback = document.getRoot().listMeshes().length;
       
       for (const run of MODEL_REGISTRY_CONFIG.OPTIMIZER_RUNS) {
         const optimizedModelPath = this._buildOptimizedModelPath(absoluteModelPath);
-        const optimizedSuffixedModelPath = this._buildOptimizedSuffixedModelPath(optimizedModelPath, run.suffix);
+        const optimizedSuffixedModelPath = this._resolveExistingOptimizedSuffixedModelPath(optimizedModelPath, run.suffix);
+        let meshCount = meshCountFallback;
+
+        if (optimizedSuffixedModelPath) {
+          try {
+            meshCount = (await io.read(optimizedSuffixedModelPath)).getRoot().listMeshes().length;
+          } catch {
+            meshCount = meshCountFallback;
+          }
+        }
 
         optimizedModelData[run.suffix] = {
-          meshCount: (await io.read(optimizedSuffixedModelPath)).getRoot().listMeshes().length,
+          meshCount,
         };
       }
 
@@ -566,6 +576,24 @@ export default class ModelRegistry {
   /** @internal */
   private _buildOptimizedSuffixedModelPath(optimizedModelPath: string, suffix: string): string {
     return optimizedModelPath.replace(/(\.[^/.]+)$/, `${suffix}.glb`);
+  }
+
+  /** @internal */
+  private _resolveExistingOptimizedSuffixedModelPath(optimizedModelPath: string, suffix: string): string | undefined {
+    const glbPath = this._buildOptimizedSuffixedModelPath(optimizedModelPath, suffix);
+    const optimizedExt = path.extname(optimizedModelPath) || '.gltf';
+
+    const candidates = [
+      glbPath,
+      glbPath.replace(/\.glb$/i, optimizedExt),
+      glbPath.replace(/\.glb$/i, '.gltf'),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return undefined;
   }
 
   /** @internal */
