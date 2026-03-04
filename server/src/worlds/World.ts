@@ -563,11 +563,11 @@ export default class World extends EventRouter implements protocol.Serializable 
     if (WorldMapChunkCacheCodec.isWorldMapChunkCache(map)) {
       const { metadata, chunks } = WorldMapChunkCacheCodec.decode(map);
 
-      registerMapBlockTypes(metadata.blockTypes);
+      registerMapBlockTypes(map.blockTypes ?? metadata.blockTypes);
 
       this.chunkLattice.initializeChunkCacheChunks(chunks);
 
-      spawnMapEntities(metadata.entities);
+      spawnMapEntities(map.entities ?? metadata.entities);
 
       return;
     }

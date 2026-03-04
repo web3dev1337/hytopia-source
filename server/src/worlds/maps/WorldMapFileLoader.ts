@@ -58,6 +58,18 @@ export default class WorldMapFileLoader {
                 const compressedRaw = fs.readFileSync(compressedPath, 'utf-8');
                 const actual = sha256Hex(compressedRaw);
                 if (actual === expected) {
+                  const hasEntities = metadata.entities && Object.keys(metadata.entities).length > 0;
+                  if (hasEntities) return cache;
+
+                  try {
+                    const parsedCompressed = JSON.parse(compressedRaw) as unknown;
+                    if (WorldMapCodec.isCompressedWorldMap(parsedCompressed) && parsedCompressed.entities) {
+                      return { ...cache, entities: parsedCompressed.entities };
+                    }
+                  } catch {
+                    // Ignore overlay failures; cache is still valid for blocks.
+                  }
+
                   return cache;
                 }
 
@@ -69,6 +81,25 @@ export default class WorldMapFileLoader {
               }
             } else {
               // Cache has no source hash; accept cache.
+              const hasEntities = metadata.entities && Object.keys(metadata.entities).length > 0;
+              if (hasEntities) return cache;
+
+              const compressedPath = absoluteMapPath.endsWith('.compressed.json')
+                ? absoluteMapPath
+                : basePath + '.compressed.json';
+
+              if (fs.existsSync(compressedPath)) {
+                try {
+                  const compressedRaw = fs.readFileSync(compressedPath, 'utf-8');
+                  const parsedCompressed = JSON.parse(compressedRaw) as unknown;
+                  if (WorldMapCodec.isCompressedWorldMap(parsedCompressed) && parsedCompressed.entities) {
+                    return { ...cache, entities: parsedCompressed.entities };
+                  }
+                } catch {
+                  // Ignore overlay failures; cache is still valid for blocks.
+                }
+              }
+
               return cache;
             }
           } catch {

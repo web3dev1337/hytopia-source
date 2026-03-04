@@ -38,6 +38,12 @@ export interface WorldMapChunkCache {
 
   algorithm?: WorldMapChunkCacheAlgorithm;
   data: string;
+
+  // Optional overlays. These are not part of the binary codec, but allow
+  // loaders to provide entities/blockTypes from a sibling JSON map when the
+  // cache was generated without them (or to override stale metadata).
+  blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+  entities?: WorldMap['entities'];
 }
 
 export interface CreateWorldMapChunkCacheOptions {
