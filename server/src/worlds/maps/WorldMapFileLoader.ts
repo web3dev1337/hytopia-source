@@ -4,14 +4,12 @@ import crypto from 'crypto';
 import ErrorHandler from '@/errors/ErrorHandler';
 import WorldMapCodec from '@/worlds/maps/WorldMapCodec';
 import WorldMapChunkCacheCodec from '@/worlds/maps/WorldMapChunkCacheCodec';
+import { WORLD_MAP_CHUNK_CACHE_MAGIC, WORLD_MAP_CHUNK_CACHE_VERSION, WORLD_MAP_CHUNK_CACHE_HEADER_SIZE } from '@/worlds/maps/WorldMapChunkCacheFormat';
 import type { WorldMap } from '@/worlds/World';
 import type { CompressedWorldMap } from '@/worlds/maps/WorldMapCodec';
 import type { WorldMapChunkCache } from '@/worlds/maps/WorldMapChunkCacheCodec';
 
 export type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
-
-const CHUNK_CACHE_MAGIC = Buffer.from('HYTCHUNK');
-const CHUNK_CACHE_VERSION = 1;
 
 function sha256Hex(input: Buffer | string): string {
   const h = crypto.createHash('sha256');
@@ -37,9 +35,9 @@ export default class WorldMapFileLoader {
       if (fs.existsSync(chunkCachePath)) {
         const raw = fs.readFileSync(chunkCachePath);
 
-        const looksValid = raw.byteLength >= 12 &&
-          raw.subarray(0, 8).equals(CHUNK_CACHE_MAGIC) &&
-          raw.readUInt8(8) === CHUNK_CACHE_VERSION;
+        const looksValid = raw.byteLength >= WORLD_MAP_CHUNK_CACHE_HEADER_SIZE &&
+          raw.subarray(0, 8).equals(WORLD_MAP_CHUNK_CACHE_MAGIC) &&
+          raw.readUInt8(8) === WORLD_MAP_CHUNK_CACHE_VERSION;
 
         if (looksValid) {
           const cache = { data: raw.toString('base64') };
