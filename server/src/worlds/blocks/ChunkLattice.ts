@@ -395,6 +395,78 @@ export default class ChunkLattice extends EventRouter {
     }
   }
 
+  /** @internal */
+  public initializeChunkCacheChunks(chunks: Iterable<{
+    originCoordinate: Vector3Like;
+    blocks: Uint8Array;
+    blockRotations: Map<number, BlockRotation>;
+  }>): void {
+    this.clear();
+
+    if (!this._rigidBody) {
+      this._rigidBody = new RigidBody({ type: RigidBodyType.FIXED });
+      this._rigidBody.addToSimulation(this._world.simulation);
+    }
+
+    for (const chunkData of chunks) {
+      const chunkKey = this._packCoordinate(chunkData.originCoordinate);
+      const chunk = new Chunk(chunkData.originCoordinate);
+      chunk.initializeRaw(chunkData.blocks, chunkData.blockRotations);
+      this._chunks.set(chunkKey, chunk);
+
+      this.emitWithWorld(this._world, ChunkLatticeEvent.ADD_CHUNK, {
+        chunkLattice: this,
+        chunk,
+      });
+
+      const blocks = chunkData.blocks;
+      for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+        const blockTypeId = blocks[blockIndex];
+        if (blockTypeId === 0) continue;
+
+        let chunkMasks = this._blockTypeChunkMasks.get(blockTypeId);
+        if (!chunkMasks) {
+          chunkMasks = new Map();
+          this._blockTypeChunkMasks.set(blockTypeId, chunkMasks);
+        }
+
+        let chunkMask = chunkMasks.get(chunkKey);
+        if (!chunkMask) {
+          chunkMask = new Uint32Array(CHUNK_MASK_WORD_COUNT);
+          chunkMasks.set(chunkKey, chunkMask);
+        }
+
+        const wordIndex = blockIndex >>> 5;
+        const bitMask = (1 << (blockIndex & 31)) >>> 0;
+
+        if ((chunkMask[wordIndex] & bitMask) !== 0) {
+          continue;
+        }
+
+        chunkMask[wordIndex] |= bitMask;
+        this._blockTypeCounts.set(blockTypeId, (this._blockTypeCounts.get(blockTypeId) ?? 0) + 1);
+      }
+    }
+
+    for (let blockTypeId = 1; blockTypeId <= MAX_BLOCK_TYPE_ID; blockTypeId++) {
+      const blockCount = this.getBlockTypeCount(blockTypeId);
+      if (blockCount === 0) {
+        continue;
+      }
+
+      const blockPlacements = this._getBlockTypePlacements(blockTypeId);
+      const collider = this.getOrCreateBlockTypeCollider(blockTypeId, blockPlacements);
+      const blockType = this._world.blockTypeRegistry.getBlockType(blockTypeId);
+
+      collider.addToSimulation(this._world.simulation, this._rigidBody);
+      this._world.simulation.colliderMap.setColliderBlockType(collider, blockType);
+
+      if (collider.isVoxel) {
+        this._combineVoxelStates(collider);
+      }
+    }
+  }
+
   /**
    * Sets the block at a global coordinate by block type ID.
    *

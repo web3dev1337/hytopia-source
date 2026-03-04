@@ -1,6 +1,12 @@
-# Map Compression Benchmarks + Comparison (2026-03-03)
+# Map Compression Benchmarks + Comparison (2026-03-03, updated 2026-03-04)
 
-This repo now supports loading **either** legacy `WorldMap` JSON (`{ blockTypes, blocks, entities }`) **or** a compressed map object (`{ data, bounds, ... }`) via `World.loadMap()` with auto-detection.
+This repo now supports loading:
+
+- legacy `WorldMap` JSON (`{ blockTypes, blocks, entities }`)
+- a compressed map object (`CompressedWorldMap`: `{ data, bounds, ... }`)
+- an optional **chunk cache** (`WorldMapChunkCache`) for faster `loadMap(...)` on large maps
+
+All formats are accepted by `World.loadMap()` with auto-detection.
 
 This document records benchmarks from **Tuesday, March 3, 2026**, and compares the native implementation to `hytopia-map-compression`.
 
@@ -14,12 +20,15 @@ This document records benchmarks from **Tuesday, March 3, 2026**, and compares t
 ## Native SDK Implementation (this PR)
 
 - Codec: `server/src/worlds/maps/WorldMapCodec.ts`
-- Auto-load: `server/src/worlds/World.ts` (`loadMap(map: WorldMap | CompressedWorldMap)`)
+- Chunk cache codec: `server/src/worlds/maps/WorldMapChunkCacheCodec.ts`
+- Optional file helper: `server/src/worlds/maps/WorldMapFileLoader.ts`
+- Auto-load: `server/src/worlds/World.ts` (`loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache)`)
 - Key behaviors:
   - **Backwards compatible:** classic JSON maps still load unchanged.
   - **Forward compatible:** `{ data: base64, bounds: {minX..maxZ} }` maps load automatically.
   - **Streaming load:** compressed maps decode into `ChunkLattice.initializeBlockEntries(...)` without building a giant `{ "x,y,z": ... }` object in memory.
   - **Rotations supported:** rotated blocks (`{ i, r }`) are preserved (compressed maps set `options.rotations=true`).
+  - **Optional chunk cache:** `.chunks.bin` files can be generated and loaded for faster block initialization.
 
 ## Benchmark Method
 
@@ -127,7 +136,7 @@ Repo: `https://github.com/web3dev1337/hytopia-map-compression`
 | Load compressed map object | ✅ (auto-detect in `World.loadMap`) | ✅ (plugin loader) |
 | Preserve rotated blocks (`{ i, r }`) | ✅ | ❌ (blocks assumed numeric IDs) |
 | Streaming decode (avoid materializing `{ "x,y,z": ... }`) | ✅ | ❌ (unless using chunk caches) |
-| Precomputed chunk caches (`.chunks`, `.chunks.bin`) | ❌ | ✅ |
+| Precomputed chunk caches (`.chunks`, `.chunks.bin`) | ✅ (`.chunks.bin`) | ✅ |
 | Hash-based disk cache invalidation | ❌ | ✅ |
 | Avoid private-field writes / monkey patching | ✅ | ❌ (for fastest path) |
 
@@ -172,3 +181,21 @@ Native compressed maps give:
 - **Huge disk/transfer win** (e.g., 30MB → ~1MB),
 - **Lower parse cost** (hundreds of ms → ~0.1ms),
 - **Moderate `loadMap(...)` speedup** (~1.2–1.3× on multi‑million‑block maps) while keeping full physics/collider correctness and backward compatibility.
+
+**Update (Wednesday, March 4, 2026):** adding an optional `.chunks.bin` chunk cache yields a larger `loadMap(...)` speedup on very large maps (about **~2×** in the benches below) because it bypasses per-block `"x,y,z"` key parsing and per-block placement bookkeeping.
+
+### Chunk cache benches (2026-03-04)
+
+All runs: `bun server/scripts/worldmap-benchmark.ts --bench-chunk-cache --validate --iterations 3`
+
+`sdk-examples/big-world/assets/map.json`:
+- `loadMap(WorldMap)`: median `2.71s`
+- `loadMap(CompressedWorldMap)`: median `2.47s`
+- `loadMap(WorldMapChunkCache)`: median `1.20s`
+- generated cache: `sdk-examples/big-world/assets/map.chunks.bin` (`637.03KB`, brotli level `4`)
+
+`assets/release/maps/boilerplate.json`:
+- `loadMap(WorldMap)`: median `5.16s`
+- `loadMap(CompressedWorldMap)`: median `5.36s`
+- `loadMap(WorldMapChunkCache)`: median `2.55s`
+- generated cache: `assets/release/maps/boilerplate.chunks.bin` (`239.37KB`, brotli level `4`)

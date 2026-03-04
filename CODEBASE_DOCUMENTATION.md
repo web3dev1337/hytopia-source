@@ -66,6 +66,8 @@ worlds/World.ts - Contains ChunkLattice, EntityManager, Simulation, NetworkSynch
 worlds/WorldLoop.ts - Fixed 60 Hz game loop: entity logic → physics → events → network sync
 worlds/WorldManager.ts - Multi-world support, default world creation
 worlds/maps/WorldMapCodec.ts - WorldMap <-> compressed WorldMap conversion utilities
+worlds/maps/WorldMapChunkCacheCodec.ts - WorldMap/CompressedWorldMap <-> .chunks.bin chunk cache codec
+worlds/maps/WorldMapFileLoader.ts - Optional loader that prefers sibling .chunks.bin files
 ```
 
 ### Scripts (`server/scripts/`)

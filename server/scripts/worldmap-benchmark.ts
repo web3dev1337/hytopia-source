@@ -11,11 +11,15 @@ type Args = {
   mapPath: string;
   algorithm: CompressedWorldMapAlgorithm;
   level: number;
+  cacheAlgorithm: CompressedWorldMapAlgorithm;
+  cacheLevel: number;
   iterations: number;
   validate: boolean;
   preloadModels: boolean;
   skipEntities: boolean;
   outPath?: string;
+  chunkCacheOutPath?: string;
+  benchChunkCache: boolean;
 };
 
 function usage(exitCode: number): never {
@@ -29,17 +33,22 @@ function usage(exitCode: number): never {
     '  --map <path>             Map JSON path (WorldMap or CompressedWorldMap)',
     '  --algorithm <name>       brotli | gzip | none (default: brotli)',
     '  --level <0-11>           Compression level (default: 9)',
+    '  --cache-algorithm <name> brotli | gzip | none (default: brotli)',
+    '  --cache-level <0-11>     Chunk cache compression level (default: 4)',
     '  --iterations <n>         Number of load iterations per format (default: 3)',
     '  --validate               Hash chunk lattice after load',
     '  --preload-models         Preload all models before running',
     '  --skip-entities          Do not spawn map entities during load',
     '  --out <path>             Write compressed map JSON (when input is WorldMap)',
+    '  --chunk-cache-out <path> Write chunk cache binary (.chunks.bin)',
+    '  --bench-chunk-cache      Benchmark chunk cache loadMap (generated from input map)',
     '  --help                   Show help',
     '',
     'Examples:',
     '  bun scripts/worldmap-benchmark.ts --map assets/maps/boilerplate.json --validate',
     '  bun scripts/worldmap-benchmark.ts --map ../sdk-examples/big-world/assets/map.json --iterations 5',
     '  bun scripts/worldmap-benchmark.ts --cwd /path/to/game --map assets/map.json --out assets/map.compressed.json',
+    '  bun scripts/worldmap-benchmark.ts --map ../sdk-examples/big-world/assets/map.json --bench-chunk-cache --chunk-cache-out ../sdk-examples/big-world/assets/map.chunks.bin',
   ].join('\n'));
 
   process.exit(exitCode);
@@ -50,11 +59,15 @@ function parseArgs(argv: string[]): Args {
   let mapPath: string | undefined;
   let algorithm: CompressedWorldMapAlgorithm = 'brotli';
   let level = 9;
+  let cacheAlgorithm: CompressedWorldMapAlgorithm = 'brotli';
+  let cacheLevel = 4;
   let iterations = 3;
   let validate = false;
   let preloadModels = false;
   let skipEntities = false;
   let outPath: string | undefined;
+  let chunkCacheOutPath: string | undefined;
+  let benchChunkCache = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -88,6 +101,24 @@ function parseArgs(argv: string[]): Args {
       continue;
     }
 
+    if (arg === '--cache-algorithm') {
+      const value = argv[++i] as CompressedWorldMapAlgorithm;
+      if (value !== 'brotli' && value !== 'gzip' && value !== 'none') {
+        throw new Error(`Invalid --cache-algorithm: ${value}`);
+      }
+      cacheAlgorithm = value;
+      continue;
+    }
+
+    if (arg === '--cache-level') {
+      const value = Number(argv[++i]);
+      if (!Number.isFinite(value) || value < 0 || value > 11) {
+        throw new Error(`Invalid --cache-level: ${value}`);
+      }
+      cacheLevel = value;
+      continue;
+    }
+
     if (arg === '--iterations') {
       const value = Number(argv[++i]);
       if (!Number.isInteger(value) || value < 1) {
@@ -117,6 +148,16 @@ function parseArgs(argv: string[]): Args {
       continue;
     }
 
+    if (arg === '--chunk-cache-out') {
+      chunkCacheOutPath = argv[++i];
+      continue;
+    }
+
+    if (arg === '--bench-chunk-cache') {
+      benchChunkCache = true;
+      continue;
+    }
+
     throw new Error(`Unknown arg: ${arg}`);
   }
 
@@ -127,11 +168,15 @@ function parseArgs(argv: string[]): Args {
     mapPath,
     algorithm,
     level,
+    cacheAlgorithm,
+    cacheLevel,
     iterations,
     validate,
     preloadModels,
     skipEntities,
     outPath,
+    chunkCacheOutPath,
+    benchChunkCache,
   };
 }
 
@@ -215,14 +260,19 @@ function createBenchWorld(WorldCtor: any): any {
   });
 }
 
-function benchLoadMap(WorldCtor: any, map: any, iterations: number): { timesMs: number[], lastWorld: any } {
+function benchLoadMap(
+  WorldCtor: any,
+  map: any,
+  iterations: number,
+  loadOptions: { spawnEntities: boolean },
+): { timesMs: number[], lastWorld: any } {
   let lastWorld: any | undefined;
   const timesMs: number[] = [];
 
   for (let i = 0; i < iterations; i++) {
     const world = createBenchWorld(WorldCtor);
     const start = process.hrtime.bigint();
-    world.loadMap(map);
+    world.loadMap(map, loadOptions);
     const end = process.hrtime.bigint();
     timesMs.push(hrtimeMs(start, end));
     lastWorld = world;
@@ -249,11 +299,13 @@ async function main(): Promise<void> {
     { default: ModelRegistry },
     { default: World },
     { default: WorldMapCodec },
+    { default: WorldMapChunkCacheCodec },
   ] = await Promise.all([
     import('../src/textures/BlockTextureRegistry.ts'),
     import('../src/models/ModelRegistry.ts'),
     import('../src/worlds/World.ts'),
     import('../src/worlds/maps/WorldMapCodec.ts'),
+    import('../src/worlds/maps/WorldMapChunkCacheCodec.ts'),
   ]);
 
   // eslint-disable-next-line no-console
@@ -275,22 +327,42 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`init: ${formatMs(hrtimeMs(initStart, initEnd))}`);
 
-  const readStart = process.hrtime.bigint();
-  const raw = fs.readFileSync(absoluteMapPath, 'utf-8');
-  const readEnd = process.hrtime.bigint();
-  // eslint-disable-next-line no-console
-  console.log(`read: ${formatMs(hrtimeMs(readStart, readEnd))}`);
+  const spawnEntities = !args.skipEntities;
+  const loadOptions = { spawnEntities };
 
-  const parseStart = process.hrtime.bigint();
-  const parsed = JSON.parse(raw) as unknown;
-  const parseEnd = process.hrtime.bigint();
-  // eslint-disable-next-line no-console
-  console.log(`parse: ${formatMs(hrtimeMs(parseStart, parseEnd))}`);
+  const isChunkCacheBinary = absoluteMapPath.endsWith('.chunks.bin');
+
+  let parsed: unknown;
+  if (isChunkCacheBinary) {
+    const readStart = process.hrtime.bigint();
+    const rawBin = fs.readFileSync(absoluteMapPath);
+    const readEnd = process.hrtime.bigint();
+    // eslint-disable-next-line no-console
+    console.log(`read: ${formatMs(hrtimeMs(readStart, readEnd))}`);
+    // eslint-disable-next-line no-console
+    console.log('parse: (binary)');
+    parsed = { data: rawBin.toString('base64') };
+  } else {
+    const readStart = process.hrtime.bigint();
+    const raw = fs.readFileSync(absoluteMapPath, 'utf-8');
+    const readEnd = process.hrtime.bigint();
+    // eslint-disable-next-line no-console
+    console.log(`read: ${formatMs(hrtimeMs(readStart, readEnd))}`);
+
+    const parseStart = process.hrtime.bigint();
+    parsed = JSON.parse(raw) as unknown;
+    const parseEnd = process.hrtime.bigint();
+    // eslint-disable-next-line no-console
+    console.log(`parse: ${formatMs(hrtimeMs(parseStart, parseEnd))}`);
+  }
 
   let worldMap: any | undefined;
   let compressedMap: any | undefined;
+  let chunkCache: any | undefined;
 
-  if (WorldMapCodec.isCompressedWorldMap(parsed)) {
+  if (WorldMapChunkCacheCodec.isWorldMapChunkCache(parsed)) {
+    chunkCache = parsed;
+  } else if (WorldMapCodec.isCompressedWorldMap(parsed)) {
     compressedMap = parsed;
   } else {
     worldMap = parsed as WorldMap;
@@ -326,10 +398,12 @@ async function main(): Promise<void> {
   }
 
   if (!compressedMap) {
-    throw new Error('Failed to resolve compressed map input.');
+    if (!chunkCache) {
+      throw new Error('Failed to resolve map input.');
+    }
   }
 
-  {
+  if (compressedMap) {
     const originalEntityCount = countKeys(compressedMap.entities);
     const entityCountLabel = args.skipEntities && originalEntityCount > 0
       ? `${originalEntityCount.toLocaleString()} (skipped)`
@@ -342,49 +416,87 @@ async function main(): Promise<void> {
     console.log(`compressedMap: algorithm=${compressedMap.algorithm ?? 'brotli'} rotations=${compressedMap.options?.rotations === true} blockTypes=${blockTypesCount} entities=${entityCountLabel}`);
   }
 
-  const worldMapForLoad = worldMap && args.skipEntities ? { ...worldMap, entities: undefined } : worldMap;
-  const compressedMapForLoad = args.skipEntities ? { ...compressedMap, entities: undefined } : compressedMap;
-
-  if (worldMapForLoad) {
+  if (worldMap) {
     const jsonBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
     if (jsonBenchWarmup > 0) {
-      benchLoadMap(World, worldMapForLoad, jsonBenchWarmup);
+      benchLoadMap(World, worldMap, jsonBenchWarmup, loadOptions);
     }
 
-    const jsonBench = benchLoadMap(World, worldMapForLoad, args.iterations);
+    const jsonBench = benchLoadMap(World, worldMap, args.iterations, loadOptions);
     const jsonMedian = median(jsonBench.timesMs);
     // eslint-disable-next-line no-console
     console.log(`loadMap WorldMap: median=${formatMs(jsonMedian)} min=${formatMs(Math.min(...jsonBench.timesMs))} max=${formatMs(Math.max(...jsonBench.timesMs))} runs=${args.iterations}`);
   }
 
-  const compressedBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
-  if (compressedBenchWarmup > 0) {
-    benchLoadMap(World, compressedMapForLoad, compressedBenchWarmup);
+  if (compressedMap) {
+    const compressedBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
+    if (compressedBenchWarmup > 0) {
+      benchLoadMap(World, compressedMap, compressedBenchWarmup, loadOptions);
+    }
+    const compressedBench = benchLoadMap(World, compressedMap, args.iterations, loadOptions);
+    const compressedMedian = median(compressedBench.timesMs);
+    // eslint-disable-next-line no-console
+    console.log(`loadMap CompressedWorldMap: median=${formatMs(compressedMedian)} min=${formatMs(Math.min(...compressedBench.timesMs))} max=${formatMs(Math.max(...compressedBench.timesMs))} runs=${args.iterations}`);
   }
-  const compressedBench = benchLoadMap(World, compressedMapForLoad, args.iterations);
-  const compressedMedian = median(compressedBench.timesMs);
-  // eslint-disable-next-line no-console
-  console.log(`loadMap CompressedWorldMap: median=${formatMs(compressedMedian)} min=${formatMs(Math.min(...compressedBench.timesMs))} max=${formatMs(Math.max(...compressedBench.timesMs))} runs=${args.iterations}`);
 
-  if (args.validate && worldMapForLoad) {
+  if (!chunkCache && compressedMap && (args.benchChunkCache || args.chunkCacheOutPath)) {
+    const cacheStart = process.hrtime.bigint();
+    chunkCache = WorldMapChunkCacheCodec.create(compressedMap, {
+      algorithm: args.cacheAlgorithm,
+      level: args.cacheLevel,
+    });
+    const cacheEnd = process.hrtime.bigint();
+    // eslint-disable-next-line no-console
+    console.log(`chunkCache: create=${formatMs(hrtimeMs(cacheStart, cacheEnd))} algorithm=${args.cacheAlgorithm} level=${args.cacheLevel}`);
+  }
+
+  if (chunkCache) {
+    if (args.chunkCacheOutPath) {
+      const out = path.resolve(process.cwd(), args.chunkCacheOutPath);
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.writeFileSync(out, Buffer.from(chunkCache.data, 'base64'));
+      // eslint-disable-next-line no-console
+      console.log(`wrote: ${out} (${formatBytes(fs.statSync(out).size)})`);
+    }
+
+    if (args.benchChunkCache) {
+      const chunkCacheWarmup = Math.max(0, Math.min(1, args.iterations - 1));
+      if (chunkCacheWarmup > 0) {
+        benchLoadMap(World, chunkCache, chunkCacheWarmup, loadOptions);
+      }
+      const chunkCacheBench = benchLoadMap(World, chunkCache, args.iterations, loadOptions);
+      const chunkCacheMedian = median(chunkCacheBench.timesMs);
+      // eslint-disable-next-line no-console
+      console.log(`loadMap WorldMapChunkCache: median=${formatMs(chunkCacheMedian)} min=${formatMs(Math.min(...chunkCacheBench.timesMs))} max=${formatMs(Math.max(...chunkCacheBench.timesMs))} runs=${args.iterations}`);
+    }
+  }
+
+  if (args.validate) {
     // eslint-disable-next-line no-console
     console.log('validate: hashing chunk lattice...');
 
-    const a = createBenchWorld(World);
-    a.loadMap(worldMapForLoad);
-    const aHash = hashChunkLattice(a);
+    const baselineMap = worldMap ?? compressedMap ?? chunkCache;
+    if (!baselineMap) {
+      throw new Error('validate: no baseline map available.');
+    }
 
-    const b = createBenchWorld(World);
-    b.loadMap(compressedMapForLoad);
-    const bHash = hashChunkLattice(b);
+    const baseline = createBenchWorld(World);
+    baseline.loadMap(baselineMap, loadOptions);
+    const baselineHash = hashChunkLattice(baseline);
 
-    const ok = aHash.hash === bHash.hash;
-    // eslint-disable-next-line no-console
-    console.log(`validate: ok=${ok} chunks=${aHash.chunkCount}/${bHash.chunkCount} blocks=${aHash.totalBlocks.toLocaleString()}/${bHash.totalBlocks.toLocaleString()}`);
-    // eslint-disable-next-line no-console
-    console.log(`validate: worldMapHash=${aHash.hash}`);
-    // eslint-disable-next-line no-console
-    console.log(`validate: compressedHash=${bHash.hash}`);
+    const candidates: Array<{ label: string, map: any }> = [];
+    if (worldMap) candidates.push({ label: 'WorldMap', map: worldMap });
+    if (compressedMap) candidates.push({ label: 'CompressedWorldMap', map: compressedMap });
+    if (chunkCache) candidates.push({ label: 'WorldMapChunkCache', map: chunkCache });
+
+    for (const candidate of candidates) {
+      const w = createBenchWorld(World);
+      w.loadMap(candidate.map, loadOptions);
+      const h = hashChunkLattice(w);
+      const ok = h.hash === baselineHash.hash;
+      // eslint-disable-next-line no-console
+      console.log(`validate: ${candidate.label} ok=${ok} chunks=${h.chunkCount.toLocaleString()} blocks=${h.totalBlocks.toLocaleString()} hash=${h.hash}`);
+    }
   }
 }
 

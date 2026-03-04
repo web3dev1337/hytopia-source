@@ -186,6 +186,20 @@ export type { WorldEventPayloads, WorldMap, WorldOptions } from '@/worlds/World'
 export { default as WorldMapCodec } from '@/worlds/maps/WorldMapCodec';
 export type { CompressedWorldMap, CompressWorldMapOptions, CompressedWorldMapAlgorithm } from '@/worlds/maps/WorldMapCodec';
 
+// WorldMapChunkCacheCodec
+export { default as WorldMapChunkCacheCodec } from '@/worlds/maps/WorldMapChunkCacheCodec';
+export type {
+  WorldMapChunkCache,
+  WorldMapChunkCacheAlgorithm,
+  WorldMapChunkCacheMetadata,
+  WorldMapChunkCacheOptions,
+  CreateWorldMapChunkCacheOptions,
+} from '@/worlds/maps/WorldMapChunkCacheCodec';
+
+// WorldMapFileLoader
+export { default as WorldMapFileLoader } from '@/worlds/maps/WorldMapFileLoader';
+export type { AnyWorldMap } from '@/worlds/maps/WorldMapFileLoader';
+
 // WorldLoop
 export { default as WorldLoop, WorldLoopEvent } from '@/worlds/WorldLoop';
 export type { WorldLoopEventPayloads } from '@/worlds/WorldLoop';

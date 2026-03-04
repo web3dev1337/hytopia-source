@@ -197,6 +197,16 @@ export default class Chunk implements protocol.Serializable {
   }
 
   /** @internal */
+  public initializeRaw(blocks: Uint8Array, blockRotations?: Map<number, BlockRotation>): void {
+    if (blocks.length !== CHUNK_VOLUME) {
+      return ErrorHandler.error(`Chunk.initializeRaw(): Expected blocks length ${CHUNK_VOLUME}, got ${blocks.length}.`);
+    }
+
+    this._blocks = blocks;
+    this._blockRotations = blockRotations ?? new Map<number, BlockRotation>();
+  }
+
+  /** @internal */
   public serialize(): protocol.ChunkSchema {
     return Serializer.serializeChunk(this);
   }
