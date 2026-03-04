@@ -13,6 +13,7 @@ Scope (current code):
 - Backwards compatible: legacy `WorldMap` still loads unchanged.
 - Portable compressed format: `CompressedWorldMap` streaming decode (no giant blocks object).
 - Optional cache format: `.chunks.bin` is versioned + magic-headered (`HYTCHUNK`).
+- Entities preserved: `entities` are carried through `CompressedWorldMap` + `.chunks.bin` metadata; loader can overlay entities/blockTypes from sibling JSON when caches were generated without them.
 - Safe cache load: chunk origins validated (integer, 16-aligned) + duplicate chunks rejected.
 - Faster cache path: collider placements are accumulated during cache scan (avoids rescanning masks to build placements).
 - Auto-detect: `World.loadMap(...)` accepts all formats without call-site changes.
