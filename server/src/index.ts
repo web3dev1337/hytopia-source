@@ -200,6 +200,10 @@ export type {
 export { default as WorldMapFileLoader } from '@/worlds/maps/WorldMapFileLoader';
 export type { AnyWorldMap } from '@/worlds/maps/WorldMapFileLoader';
 
+// WorldMapArtifactsGenerator
+export { default as WorldMapArtifactsGenerator } from '@/worlds/maps/WorldMapArtifacts';
+export type { WorldMapArtifacts } from '@/worlds/maps/WorldMapArtifacts';
+
 // WorldLoop
 export { default as WorldLoop, WorldLoopEvent } from '@/worlds/WorldLoop';
 export type { WorldLoopEventPayloads } from '@/worlds/WorldLoop';

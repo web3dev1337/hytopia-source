@@ -69,6 +69,7 @@ worlds/maps/WorldMapCodec.ts - WorldMap <-> compressed WorldMap conversion utili
 worlds/maps/WorldMapChunkCacheCodec.ts - WorldMap/CompressedWorldMap <-> .chunks.bin chunk cache codec
 worlds/maps/WorldMapChunkCacheFormat.ts - Chunk cache file format constants/helpers
 worlds/maps/WorldMapFileLoader.ts - Optional loader that prefers sibling .chunks.bin files
+worlds/maps/WorldMapArtifacts.ts - Helper to generate compressed JSON + chunk cache artifacts (no IO)
 ```
 
 ### Scripts (`server/scripts/`)

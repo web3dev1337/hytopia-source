@@ -19,9 +19,12 @@ function sha256Hex(input: Buffer | string): string {
 }
 
 export default class WorldMapFileLoader {
-  public static load(mapPath: string, options: { preferChunkCache?: boolean } = {}): AnyWorldMap {
+  public static load(mapPath: string, options: { preferChunkCache?: boolean, warnings?: 'auto' | 'always' | 'never' } = {}): AnyWorldMap {
     const preferChunkCache = options.preferChunkCache ?? true;
     const absoluteMapPath = path.resolve(process.cwd(), mapPath);
+    const warnings = options.warnings ?? 'auto';
+    const shouldWarn = warnings === 'always' || (warnings === 'auto' && process.env.NODE_ENV !== 'production');
+    const warn = (message: string) => { if (shouldWarn) ErrorHandler.warning(message); };
 
     if (preferChunkCache) {
       const basePath = absoluteMapPath.endsWith('.compressed.json')
@@ -57,8 +60,11 @@ export default class WorldMapFileLoader {
                 if (actual === expected) {
                   return cache;
                 }
+
+                warn(`WorldMapFileLoader.load(): Chunk cache sha256 mismatch for ${chunkCachePath}; ignoring cache and falling back to JSON.`);
               } else {
-                // No compressed source file available to validate against; accept cache.
+                warn(`WorldMapFileLoader.load(): Chunk cache has source sha256, but ${compressedPath} is missing; using cache without validation.`);
+
                 return cache;
               }
             } else {
@@ -66,7 +72,7 @@ export default class WorldMapFileLoader {
               return cache;
             }
           } catch {
-            // If metadata decode fails, treat cache as invalid and fall back to JSON.
+            warn(`WorldMapFileLoader.load(): Failed to decode chunk cache metadata for ${chunkCachePath}; ignoring cache and falling back to JSON.`);
           }
         }
       }
