@@ -17,6 +17,36 @@ This document records benchmarks from **Tuesday, March 3, 2026**, and compares t
 - Node: `v25.2.1`
 - Benchmark harness: `server/scripts/worldmap-benchmark.ts`
 
+## Quick Tables (Easy Scan)
+
+### Load Time (medians)
+
+| Map | `WorldMap` | `CompressedWorldMap` | `WorldMapChunkCache` |
+|---|---:|---:|---:|
+| `sdk-examples/big-world/assets/map.json` | `2.99s` | `2.35s` | `1.08s` |
+| `assets/release/maps/boilerplate.json` | `4.97s` | `4.42s` | `2.40s` |
+
+### End-to-End (read + parse + load)
+
+| Map | `WorldMap` | `CompressedWorldMap(file)` | `WorldMapChunkCache(file)` |
+|---|---:|---:|---:|
+| `sdk-examples/big-world/assets/map.json` | `2.74s` | `2.20s` | `1.03s` |
+| `assets/release/maps/boilerplate.json` | `5.16s` | `4.17s` | `2.44s` |
+
+### What You Ship (disk)
+
+| Map | `map.json` | `map.compressed.json` | `map.chunks.bin` | `compressed + chunks` |
+|---|---:|---:|---:|---:|
+| `sdk-examples/big-world/assets/map.json` | `29.99MB` | `1.01MB` | `637.03KB` | `~1.64MB` |
+| `assets/release/maps/boilerplate.json` | `28.28MB` | `439.94KB` | `239.37KB` | `~679.31KB` |
+
+### Cold Start Init (add once on boot)
+
+| Map run | init (`RAPIER` + atlas) |
+|---|---:|
+| `big-world` bench run | `88.52ms` |
+| `boilerplate` bench run | `37.79ms` |
+
 ## Native SDK Implementation (this PR)
 
 - Codec: `server/src/worlds/maps/WorldMapCodec.ts`
