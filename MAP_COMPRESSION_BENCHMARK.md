@@ -173,7 +173,7 @@ Repo: `https://github.com/web3dev1337/hytopia-map-compression`
 | Preserve rotated blocks (`{ i, r }`) | ✅ | ❌ (blocks assumed numeric IDs) |
 | Streaming decode (avoid materializing `{ "x,y,z": ... }`) | ✅ | ❌ (unless using chunk caches) |
 | Precomputed chunk caches (`.chunks`, `.chunks.bin`) | ✅ (`.chunks.bin`) | ✅ |
-| Hash-based disk cache invalidation | ❌ | ✅ |
+| Hash-based disk cache invalidation | ✅ (optional) | ✅ |
 | Avoid private-field writes / monkey patching | ✅ | ❌ (for fastest path) |
 
 ### What matches (core compression)
@@ -219,6 +219,10 @@ Native compressed maps give:
 - **Moderate `loadMap(...)` speedup** (~1.2–1.3× on multi‑million‑block maps) while keeping full physics/collider correctness and backward compatibility.
 
 **Update (Wednesday, March 4, 2026):** adding an optional `.chunks.bin` chunk cache yields a larger `loadMap(...)` speedup on very large maps (about **~2×** in the benches below) because it bypasses per-block `"x,y,z"` key parsing and per-block placement bookkeeping.
+
+### Cache invalidation (optional)
+
+`WorldMapFileLoader` prefers a sibling `*.chunks.bin` only if it looks valid. If the cache contains `metadata.source.sha256` and a sibling `*.compressed.json` exists, it validates that hash and **falls back automatically** when it doesn’t match (stale cache).
 
 ### Chunk cache benches (2026-03-04)
 

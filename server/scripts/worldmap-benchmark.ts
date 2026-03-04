@@ -252,6 +252,12 @@ function median(values: number[]): number {
   return sorted[mid];
 }
 
+function sha256Hex(input: string | Buffer): string {
+  const h = crypto.createHash('sha256');
+  h.update(input);
+  return h.digest('hex');
+}
+
 function countKeys(record: unknown): number {
   if (!record || typeof record !== 'object') return 0;
   let count = 0;
@@ -379,6 +385,7 @@ async function main(): Promise<void> {
   let parsed: unknown;
   let inputReadMs = 0;
   let inputParseMs = 0;
+  let inputRawText: string | undefined;
   if (isChunkCacheBinary) {
     const { buffer, ms } = readBinaryFileTimed(absoluteMapPath);
     inputReadMs = ms;
@@ -389,6 +396,7 @@ async function main(): Promise<void> {
     parsed = { data: buffer.toString('base64') };
   } else {
     const { text, ms } = readTextFileTimed(absoluteMapPath);
+    inputRawText = text;
     inputReadMs = ms;
     // eslint-disable-next-line no-console
     console.log(`read: ${formatMs(ms)}`);
@@ -403,11 +411,13 @@ async function main(): Promise<void> {
   let worldMap: any | undefined;
   let compressedMap: any | undefined;
   let chunkCache: any | undefined;
+  let compressedMapSourceSha256: string | undefined;
 
   if (WorldMapChunkCacheCodec.isWorldMapChunkCache(parsed)) {
     chunkCache = parsed;
   } else if (WorldMapCodec.isCompressedWorldMap(parsed)) {
     compressedMap = parsed;
+    compressedMapSourceSha256 = inputRawText ? sha256Hex(inputRawText) : undefined;
   } else {
     worldMap = parsed as WorldMap;
   }
@@ -426,6 +436,7 @@ async function main(): Promise<void> {
     const compressEnd = process.hrtime.bigint();
 
     const compressedJson = JSON.stringify(compressedMap);
+    compressedMapSourceSha256 = sha256Hex(compressedJson);
     const compressedSize = Buffer.byteLength(compressedJson);
     const ratio = mapFileSize === 0 ? 0 : (1 - (compressedSize / mapFileSize));
 
@@ -463,6 +474,11 @@ async function main(): Promise<void> {
   // Size accounting: the chunk cache is typically shipped alongside a canonical map JSON.
   // eslint-disable-next-line no-console
   console.log(`sizes: input=${formatBytes(mapFileSize)}`);
+  if (compressedMap) {
+    const compressedBytes = Buffer.byteLength(JSON.stringify(compressedMap));
+    // eslint-disable-next-line no-console
+    console.log(`sizes: compressedMap=${formatBytes(compressedBytes)}`);
+  }
 
   if (worldMap) {
     const jsonBenchWarmup = Math.max(0, Math.min(1, args.iterations - 1));
@@ -492,6 +508,7 @@ async function main(): Promise<void> {
     chunkCache = WorldMapChunkCacheCodec.create(compressedMap, {
       algorithm: args.cacheAlgorithm,
       level: args.cacheLevel,
+      sourceSha256: compressedMapSourceSha256,
     });
     const cacheEnd = process.hrtime.bigint();
     // eslint-disable-next-line no-console
@@ -502,6 +519,13 @@ async function main(): Promise<void> {
     const chunkCacheBytes = Buffer.from(chunkCache.data, 'base64').byteLength;
     // eslint-disable-next-line no-console
     console.log(`sizes: chunkCache=${formatBytes(chunkCacheBytes)}`);
+    if (compressedMap) {
+      const compressedBytes = Buffer.byteLength(JSON.stringify(compressedMap));
+      // eslint-disable-next-line no-console
+      console.log(`sizes: compressedMap+chunkCache=${formatBytes(compressedBytes + chunkCacheBytes)}`);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`sizes: input+chunkCache=${formatBytes(mapFileSize + chunkCacheBytes)}`);
 
     if (args.chunkCacheOutPath) {
       const out = path.resolve(process.cwd(), args.chunkCacheOutPath);
