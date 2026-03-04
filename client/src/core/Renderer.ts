@@ -42,6 +42,18 @@ import type { NetworkManagerEventPayload } from '../network/NetworkManager';
 import { type ClientSettingsEventPayload, ClientSettingsEventType } from '../settings/SettingsManager';
 
 const MISSING_SKYBOX_TEXTURE_PATH = '/textures/missing-skybox';
+const IOS_MAX_RENDER_PIXEL_RATIO = 1.5;
+const OTHER_MOBILE_MAX_RENDER_PIXEL_RATIO = 2.0;
+
+const isIOSOrIPadOS = (): boolean => {
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+    return true;
+  }
+
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+};
+
+const MAX_MOBILE_DPR = isIOSOrIPadOS() ? IOS_MAX_RENDER_PIXEL_RATIO : OTHER_MOBILE_MAX_RENDER_PIXEL_RATIO;
 
 // Working variables
 const color = new Color();
@@ -494,7 +506,7 @@ export default class Renderer {
     const { resolution } = this._game.settingsManager.qualityPerfTradeoff;
 
     const devicePixelRatio = MobileManager.isMobile
-      ? Math.min(window.devicePixelRatio, 2.0)
+      ? Math.min(window.devicePixelRatio, MAX_MOBILE_DPR)
       : window.devicePixelRatio;
     this._renderer.setPixelRatio(devicePixelRatio * resolution.multiplier);
 
@@ -596,7 +608,7 @@ export default class Renderer {
     this._renderer.setSize(document.documentElement.clientWidth, document.documentElement.clientHeight);
     const resolutionMultiplier = this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier;
     const devicePixelRatio = MobileManager.isMobile
-      ? Math.min(window.devicePixelRatio, 2.0)
+      ? Math.min(window.devicePixelRatio, MAX_MOBILE_DPR)
       : window.devicePixelRatio;
     this._renderer.setPixelRatio(devicePixelRatio * resolutionMultiplier);
     this._renderer.info.autoReset = false;
