@@ -32,6 +32,7 @@ import Chunk from '../chunks/Chunk';
 import Assets from '../network/Assets';
 import EventRouter from '../events/EventRouter';
 import Game from '../Game';
+import MobileManager from '../mobile/MobileManager';
 import { modalAlert } from '../ui/Modal';
 import { NetworkManagerEventType } from '../network/NetworkManager';
 import { getTransparentSortKey, lerpColor } from '../three/utils';
@@ -41,6 +42,22 @@ import type { NetworkManagerEventPayload } from '../network/NetworkManager';
 import { type ClientSettingsEventPayload, ClientSettingsEventType } from '../settings/SettingsManager';
 
 const MISSING_SKYBOX_TEXTURE_PATH = '/textures/missing-skybox';
+const SAFE_PIXEL_RATIO_IOS = 1.5;
+const SAFE_PIXEL_RATIO_MOBILE = 2.0;
+
+const isAppleMobileDevice = (): boolean => {
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+};
+
+const safeDevicePixelRatio = (nativeRatio: number): number => {
+  if (!MobileManager.isMobile) return nativeRatio;
+
+  const gpuSafeMax = isAppleMobileDevice() ? SAFE_PIXEL_RATIO_IOS : SAFE_PIXEL_RATIO_MOBILE;
+
+  return Math.min(nativeRatio, gpuSafeMax);
+};
 
 // Working variables
 const color = new Color();
@@ -492,7 +509,7 @@ export default class Renderer {
   private _onClientSettingsUpdate = (_payload: ClientSettingsEventPayload.IUpdate): void => {
     const { resolution } = this._game.settingsManager.qualityPerfTradeoff;
 
-    this._renderer.setPixelRatio(window.devicePixelRatio * resolution.multiplier);
+    this._renderer.setPixelRatio(safeDevicePixelRatio(window.devicePixelRatio) * resolution.multiplier);
 
     this._clampTargetFogNearAndFar();
     this._setupFog();
@@ -590,7 +607,8 @@ export default class Renderer {
 
   private _setupRenderer(): void {
     this._renderer.setSize(document.documentElement.clientWidth, document.documentElement.clientHeight);
-    this._renderer.setPixelRatio(window.devicePixelRatio * this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier);
+    const resolutionMultiplier = this._game.settingsManager.qualityPerfTradeoff.resolution.multiplier;
+    this._renderer.setPixelRatio(safeDevicePixelRatio(window.devicePixelRatio) * resolutionMultiplier);
     this._renderer.info.autoReset = false;
     this._renderer.localClippingEnabled = false;
     // Be explicit about output space; this is cheap and avoids surprises across Three.js versions.
