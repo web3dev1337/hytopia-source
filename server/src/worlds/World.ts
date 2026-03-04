@@ -12,8 +12,11 @@ import SceneUIManager from '@/worlds/ui/SceneUIManager';
 import Serializer from '@/networking/Serializer';
 import Simulation from '@/worlds/physics/Simulation';
 import WorldLoop from '@/worlds/WorldLoop';
+import fs from 'fs';
+import path from 'path';
 import WorldMapCodec from '@/worlds/maps/WorldMapCodec';
 import WorldMapChunkCacheCodec from '@/worlds/maps/WorldMapChunkCacheCodec';
+import WorldMapFileLoader from '@/worlds/maps/WorldMapFileLoader';
 import { BLOCK_ROTATIONS } from '@/worlds/blocks/Block';
 import type { BlockTypeOptions } from '@/worlds/blocks/BlockType';
 import type { EntityOptions } from '@/worlds/entities/Entity';
@@ -504,16 +507,35 @@ export default class World extends EventRouter implements protocol.Serializable 
    * - Registers block types from the map into `World.blockTypeRegistry`.
    * - Spawns map entities as `isEnvironmental: true` by default.
    *
-   * @param map - The map to load.
+   * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+   *   WorldMapChunkCache) or a string file path. When a string is provided,
+   *   WorldMapFileLoader auto-detects the best available format
+   *   (.chunks.bin \> .compressed.json \> .json).
    *
    * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
    *
    * **Category:** Core
    */
   public loadMap(
-    map: WorldMap | CompressedWorldMap | WorldMapChunkCache,
+    map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string,
     options: { spawnEntities?: boolean } = {},
   ) {
+    if (typeof map === 'string') {
+      map = WorldMapFileLoader.load(map);
+    }
+
+    // Auto-upgrade: if a legacy WorldMap was passed but compressed artifacts
+    // exist at the conventional assets/ location, prefer those for faster loading.
+    if (!WorldMapCodec.isCompressedWorldMap(map) && !WorldMapChunkCacheCodec.isWorldMapChunkCache(map) && typeof map === 'object' && map !== null && 'blocks' in map) {
+      const basePath = path.resolve(process.cwd(), 'assets/map');
+      const chunkCachePath = basePath + '.chunks.bin';
+      const compressedPath = basePath + '.compressed.json';
+
+      if (fs.existsSync(chunkCachePath) || fs.existsSync(compressedPath)) {
+        map = WorldMapFileLoader.load('assets/map.json');
+      }
+    }
+
     const spawnEntities = options.spawnEntities ?? true;
 
     const registerMapBlockTypes = (blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>) => {

@@ -622,42 +622,6 @@ When to use: creating additional worlds, routing players, or querying the active
 
 
 </td></tr>
-<tr><td>
-
-[WorldMapArtifactsGenerator](./server.worldmapartifactsgenerator.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapChunkCacheCodec](./server.worldmapchunkcachecodec.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapCodec](./server.worldmapcodec.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapFileLoader](./server.worldmapfileloader.md)
-
-
-</td><td>
-
-
-</td></tr>
 </tbody></table>
 
 ## Abstract Classes
@@ -1389,24 +1353,6 @@ Event payloads for ChunkLattice emitted events.
 </td></tr>
 <tr><td>
 
-[CompressedWorldMap](./server.compressedworldmap.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[CompressWorldMapOptions](./server.compressworldmapoptions.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
 [ConeColliderOptions](./server.conecollideroptions.md)
 
 
@@ -1417,15 +1363,6 @@ The options for a cone collider.
 Use for: cone-shaped colliders. Do NOT use for: other shapes; use the matching collider option type.
 
 \*\*Category:\*\* Physics
-
-
-</td></tr>
-<tr><td>
-
-[CreateWorldMapChunkCacheOptions](./server.createworldmapchunkcacheoptions.md)
-
-
-</td><td>
 
 
 </td></tr>
@@ -1979,33 +1916,6 @@ Use for: importing static maps or tooling exports via `World.loadMap`<!-- -->. D
 </td></tr>
 <tr><td>
 
-[WorldMapChunkCache](./server.worldmapchunkcache.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapChunkCacheMetadata](./server.worldmapchunkcachemetadata.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapChunkCacheOptions](./server.worldmapchunkcacheoptions.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
 [WorldOptions](./server.worldoptions.md)
 
 
@@ -2090,15 +2000,6 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
-[AnyWorldMap](./server.anyworldmap.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
 [BlockRotation](./server.blockrotation.md)
 
 
@@ -2170,15 +2071,6 @@ A set of collision groups.
 </td><td>
 
 A callback function for a chat command.
-
-
-</td></tr>
-<tr><td>
-
-[CompressedWorldMapAlgorithm](./server.compressedworldmapalgorithm.md)
-
-
-</td><td>
 
 
 </td></tr>
@@ -2642,24 +2534,6 @@ Callback invoked when the entity finishes moving to a waypoint.
 </td><td>
 
 Callback invoked when a waypoint is skipped due to timeout.
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapArtifacts](./server.worldmapartifacts.md)
-
-
-</td><td>
-
-
-</td></tr>
-<tr><td>
-
-[WorldMapChunkCacheAlgorithm](./server.worldmapchunkcachealgorithm.md)
-
-
-</td><td>
 
 
 </td></tr>

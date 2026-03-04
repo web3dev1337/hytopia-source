@@ -243,7 +243,7 @@ The unique ID of the world.
 
 </td><td>
 
-[WorldMap](./server.worldmap.md) \| [CompressedWorldMap](./server.compressedworldmap.md) \| [WorldMapChunkCache](./server.worldmapchunkcache.md)
+[WorldMap](./server.worldmap.md)
 
 
 </td><td>

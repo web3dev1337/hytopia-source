@@ -623,7 +623,7 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
-[loadMap(map, options)](./server.world.loadmap.md)
+[loadMap(map)](./server.world.loadmap.md)
 
 
 </td><td>
