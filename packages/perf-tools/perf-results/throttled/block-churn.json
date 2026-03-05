@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-03-05T22:17:19.107Z",
+  "scenario": "block-churn",
+  "durationMs": 60704,
+  "baseline": {
+    "avgTickMs": 1.7920962972298742,
+    "maxTickMs": 818.4425780000001,
+    "p95TickMs": 15.938466400000395,
+    "p99TickMs": 32.30030700000055,
+    "ticksOverBudgetPct": 0.08977197917290083,
+    "avgMemoryMb": 59.6778865814209,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.0017992915526633703,
+        "p95Ms": 0.00264800000007502
+      },
+      "physics_step": {
+        "avgMs": 0.07971446459713513,
+        "p95Ms": 0.21731668333321372
+      },
+      "physics_cleanup": {
+        "avgMs": 0.006041949423665551,
+        "p95Ms": 0.00842779999996613
+      },
+      "simulation_step": {
+        "avgMs": 0.09204405101249048,
+        "p95Ms": 0.23842736666712577
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.0007704882554027713,
+        "p95Ms": 0.0011542333334394546
+      },
+      "world_tick": {
+        "avgMs": 1.7866339137612697,
+        "p95Ms": 15.922663583332769
+      },
+      "ticker_tick": {
+        "avgMs": 2.0766720433910724,
+        "p95Ms": 16.25997188333313
+      },
+      "serialize_packets": {
+        "avgMs": 35.30756422500021,
+        "p95Ms": 215.65989150000087
+      },
+      "send_packets": {
+        "avgMs": 8.101761554166256,
+        "p95Ms": 74.23772149999877
+      },
+      "send_all_packets": {
+        "avgMs": 3.170143889461697,
+        "p95Ms": 14.861828183333076
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.005061964011218121,
+        "p95Ms": 0.005593783333127552
+      },
+      "network_synchronize": {
+        "avgMs": 3.4166130860493653,
+        "p95Ms": 15.827658950000462
+      }
+    },
+    "network": {
+      "totalBytesSent": 700074,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 11,
+      "avgBytesSentPerSecond": 7203.236313753144,
+      "maxBytesSentPerSecond": 371429.9225781149,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 1.1557572928010482,
+      "maxPacketsSentPerSecond": 50.93357640406447,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 35.302880750000625,
+      "compressionCountTotal": 2
+    }
+  },
+  "phases": [
+    {
+      "name": "setup",
+      "durationMs": 391,
+      "collected": false
+    },
+    {
+      "name": "churn-and-measure",
+      "durationMs": 54738,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}
