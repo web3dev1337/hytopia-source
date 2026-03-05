@@ -63,16 +63,24 @@ export default class WorldMapFileLoader {
   public static load(mapPath: string, options: { preferChunkCache?: boolean, warnings?: 'auto' | 'always' | 'never' } = {}): AnyWorldMap {
     const preferChunkCache = options.preferChunkCache ?? true;
     const absoluteMapPath = path.resolve(process.cwd(), mapPath);
+    const isExplicitChunkCache = absoluteMapPath.endsWith('.chunks.bin');
     const warnings = options.warnings ?? 'auto';
     const shouldWarn = warnings === 'always' || (warnings === 'auto' && process.env.NODE_ENV !== 'production');
     const warn = (message: string) => { if (shouldWarn) ErrorHandler.warning(message); };
 
     if (preferChunkCache) {
-      const basePath = absoluteMapPath.endsWith('.compressed.json')
-        ? absoluteMapPath.slice(0, -'.compressed.json'.length)
-        : absoluteMapPath.endsWith('.json')
-          ? absoluteMapPath.slice(0, -'.json'.length)
-          : absoluteMapPath;
+      if (isExplicitChunkCache && !fs.existsSync(absoluteMapPath)) {
+        ErrorHandler.fatalError(`WorldMapFileLoader.load(): Chunk cache file not found at ${absoluteMapPath}.`);
+      }
+
+      let basePath = absoluteMapPath;
+      if (absoluteMapPath.endsWith('.compressed.json')) {
+        basePath = absoluteMapPath.slice(0, -'.compressed.json'.length);
+      } else if (absoluteMapPath.endsWith('.chunks.bin')) {
+        basePath = absoluteMapPath.slice(0, -'.chunks.bin'.length);
+      } else if (absoluteMapPath.endsWith('.json')) {
+        basePath = absoluteMapPath.slice(0, -'.json'.length);
+      }
 
       const chunkCachePath = basePath + '.chunks.bin';
 
@@ -84,37 +92,77 @@ export default class WorldMapFileLoader {
           raw.readUInt8(8) === WORLD_MAP_CHUNK_CACHE_VERSION;
 
         if (looksValid) {
-          const cache = { data: raw.toString('base64') };
+          const cache: WorldMapChunkCache = { data: raw.toString('base64') };
 
           try {
             const metadata = WorldMapChunkCacheCodec.decodeMetadata(cache);
             const expected = metadata.source?.sha256;
 
-            const overlayCandidates = new Set<string>();
-            if (absoluteMapPath.endsWith('.json')) overlayCandidates.add(absoluteMapPath);
-            overlayCandidates.add(basePath + '.compressed.json');
-            overlayCandidates.add(basePath + '.json');
+            const needsEntityOverlay = !hasNonEmptyKeys(metadata.entities);
+            const needsBlockTypesOverlay = !hasNonEmptyBlockTypes(metadata.blockTypes);
+            const needsOverlays = needsEntityOverlay || needsBlockTypesOverlay;
 
             let overlayEntities: WorldMap['entities'] | undefined;
             let overlayEntitiesFrom: string | undefined;
             let overlayBlockTypes: WorldMapChunkCache['blockTypes'] | undefined;
             let overlayBlockTypesFrom: string | undefined;
-            for (const candidate of overlayCandidates) {
-              const parsedOverlay = readJsonIfExists(candidate);
-              if (!parsedOverlay) continue;
+
+            const applyOverlays = (): WorldMapChunkCache => {
+              const shouldOverlayEntities = needsEntityOverlay && overlayEntities;
+              const shouldOverlayBlockTypes = needsBlockTypesOverlay && overlayBlockTypes;
+
+              if (!shouldOverlayEntities && !shouldOverlayBlockTypes) return cache;
+
+              if (shouldOverlayEntities && overlayEntitiesFrom) {
+                warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing entities; using entities overlay from ${overlayEntitiesFrom}.`);
+              }
+              if (shouldOverlayBlockTypes && overlayBlockTypesFrom) {
+                warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing blockTypes; using blockTypes overlay from ${overlayBlockTypesFrom}.`);
+              }
+
+              return {
+                ...cache,
+                ...(shouldOverlayEntities ? { entities: overlayEntities } : {}),
+                ...(shouldOverlayBlockTypes ? { blockTypes: overlayBlockTypes } : {}),
+              };
+            };
+
+            const loadOverlaysFromPath = (candidatePath: string): void => {
+              if (!needsOverlays) return;
+
+              const parsedOverlay = readJsonIfExists(candidatePath);
+              if (!parsedOverlay) return;
 
               const overlays = extractOverlays(parsedOverlay);
+
               if (!overlayEntities && hasNonEmptyKeys(overlays.entities)) {
                 overlayEntities = overlays.entities;
-                overlayEntitiesFrom = candidate;
+                overlayEntitiesFrom = candidatePath;
               }
               if (!overlayBlockTypes && hasNonEmptyBlockTypes(overlays.blockTypes)) {
                 overlayBlockTypes = overlays.blockTypes;
-                overlayBlockTypesFrom = candidate;
+                overlayBlockTypesFrom = candidatePath;
               }
+            };
 
-              if (overlayEntities && overlayBlockTypes) break;
-            }
+            const loadOverlaysFromCompressedRaw = (compressedRaw: string, candidatePath: string): void => {
+              if (!needsOverlays) return;
+
+              try {
+                const parsedOverlay = JSON.parse(compressedRaw) as unknown;
+                const overlays = extractOverlays(parsedOverlay);
+                if (!overlayEntities && hasNonEmptyKeys(overlays.entities)) {
+                  overlayEntities = overlays.entities;
+                  overlayEntitiesFrom = candidatePath;
+                }
+                if (!overlayBlockTypes && hasNonEmptyBlockTypes(overlays.blockTypes)) {
+                  overlayBlockTypes = overlays.blockTypes;
+                  overlayBlockTypesFrom = candidatePath;
+                }
+              } catch {
+                // Ignore overlay parse failures.
+              }
+            };
 
             if (expected) {
               const compressedPath = absoluteMapPath.endsWith('.compressed.json')
@@ -125,78 +173,42 @@ export default class WorldMapFileLoader {
                 const compressedRaw = fs.readFileSync(compressedPath, 'utf-8');
                 const actual = sha256Hex(compressedRaw);
                 if (actual === expected) {
-                  const shouldOverlayEntities = !hasNonEmptyKeys(metadata.entities) && overlayEntities;
-                  const shouldOverlayBlockTypes = !hasNonEmptyBlockTypes(metadata.blockTypes) && overlayBlockTypes;
+                  loadOverlaysFromCompressedRaw(compressedRaw, compressedPath);
 
-                  if (shouldOverlayEntities || shouldOverlayBlockTypes) {
-                    if (shouldOverlayEntities && overlayEntitiesFrom) {
-                      warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing entities; using entities overlay from ${overlayEntitiesFrom}.`);
-                    }
-                    if (shouldOverlayBlockTypes && overlayBlockTypesFrom) {
-                      warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing blockTypes; using blockTypes overlay from ${overlayBlockTypesFrom}.`);
-                    }
-
-                    return {
-                      ...cache,
-                      ...(shouldOverlayEntities ? { entities: overlayEntities } : {}),
-                      ...(shouldOverlayBlockTypes ? { blockTypes: overlayBlockTypes } : {}),
-                    };
-                  }
-
-                  return cache;
+                  return applyOverlays();
                 }
 
                 warn(`WorldMapFileLoader.load(): Chunk cache sha256 mismatch for ${chunkCachePath}; ignoring cache and falling back to JSON.`);
               } else {
                 warn(`WorldMapFileLoader.load(): Chunk cache has source sha256, but ${compressedPath} is missing; using cache without validation.`);
 
-                const shouldOverlayEntities = !hasNonEmptyKeys(metadata.entities) && overlayEntities;
-                const shouldOverlayBlockTypes = !hasNonEmptyBlockTypes(metadata.blockTypes) && overlayBlockTypes;
+                loadOverlaysFromPath(basePath + '.compressed.json');
+                loadOverlaysFromPath(basePath + '.json');
 
-                if (shouldOverlayEntities || shouldOverlayBlockTypes) {
-                  if (shouldOverlayEntities && overlayEntitiesFrom) {
-                    warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing entities; using entities overlay from ${overlayEntitiesFrom}.`);
-                  }
-                  if (shouldOverlayBlockTypes && overlayBlockTypesFrom) {
-                    warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing blockTypes; using blockTypes overlay from ${overlayBlockTypesFrom}.`);
-                  }
-
-                  return {
-                    ...cache,
-                    ...(shouldOverlayEntities ? { entities: overlayEntities } : {}),
-                    ...(shouldOverlayBlockTypes ? { blockTypes: overlayBlockTypes } : {}),
-                  };
-                }
-
-                return cache;
+                return applyOverlays();
               }
             } else {
               // Cache has no source hash; accept cache.
-              const shouldOverlayEntities = !hasNonEmptyKeys(metadata.entities) && overlayEntities;
-              const shouldOverlayBlockTypes = !hasNonEmptyBlockTypes(metadata.blockTypes) && overlayBlockTypes;
+              loadOverlaysFromPath(basePath + '.compressed.json');
+              loadOverlaysFromPath(basePath + '.json');
 
-              if (shouldOverlayEntities || shouldOverlayBlockTypes) {
-                if (shouldOverlayEntities && overlayEntitiesFrom) {
-                  warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing entities; using entities overlay from ${overlayEntitiesFrom}.`);
-                }
-                if (shouldOverlayBlockTypes && overlayBlockTypesFrom) {
-                  warn(`WorldMapFileLoader.load(): Chunk cache at ${chunkCachePath} missing blockTypes; using blockTypes overlay from ${overlayBlockTypesFrom}.`);
-                }
-
-                return {
-                  ...cache,
-                  ...(shouldOverlayEntities ? { entities: overlayEntities } : {}),
-                  ...(shouldOverlayBlockTypes ? { blockTypes: overlayBlockTypes } : {}),
-                };
-              }
-
-              return cache;
+              return applyOverlays();
             }
           } catch {
+            if (isExplicitChunkCache) {
+              ErrorHandler.fatalError(`WorldMapFileLoader.load(): Failed to decode chunk cache metadata for ${chunkCachePath}.`);
+            }
+
             warn(`WorldMapFileLoader.load(): Failed to decode chunk cache metadata for ${chunkCachePath}; ignoring cache and falling back to JSON.`);
           }
+        } else if (isExplicitChunkCache) {
+          ErrorHandler.fatalError(`WorldMapFileLoader.load(): Invalid chunk cache at ${chunkCachePath}.`);
         }
       }
+    }
+
+    if (isExplicitChunkCache) {
+      ErrorHandler.fatalError(`WorldMapFileLoader.load(): Failed to load chunk cache at ${absoluteMapPath}.`);
     }
 
     const raw = fs.readFileSync(absoluteMapPath, 'utf-8');

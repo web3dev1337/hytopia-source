@@ -1,5 +1,5 @@
 import type { AnyPacket } from '@hytopia.com/server-protocol';
-import type { ErrorEvent } from 'ws';
+import type { ErrorEvent as ErrorEvent_2 } from 'ws';
 import EventEmitter from 'eventemitter3';
 import http from 'http';
 import type { InputSchema } from '@hytopia.com/server-protocol';
@@ -11398,14 +11398,18 @@ export declare class World extends EventRouter implements protocol.Serializable 
      * - Registers block types from the map into `World.blockTypeRegistry`.
      * - Spawns map entities as `isEnvironmental: true` by default.
      *
-     * @param map - The map to load.
+     * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+     *   WorldMapChunkCache) or a string file path. When a string is provided,
+     *   WorldMapFileLoader auto-detects the best available format
+     *   (.chunks.bin \> .compressed.json \> .json).
      *
      * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
      *
      * **Category:** Core
      */
-    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache, options?: {
+    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
         spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
     }): void;
     /**
      * Sets the color of the world's ambient light.
@@ -12019,7 +12023,7 @@ export declare interface WorldOptions {
     /** The minimum distance from the camera to start applying fog. */
     fogNear?: number;
     /** The map of the world. */
-    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache;
+    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
     /** The name of the world. */
     name: string;
     /** The intensity of the skybox brightness for the world. 0 is black, 1 is full brightness, 1+ is brighter. */

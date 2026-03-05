@@ -102,7 +102,7 @@ export interface WorldOptions {
   fogNear?: number;
 
   /** The map of the world. */
-  map?: WorldMap | CompressedWorldMap | WorldMapChunkCache;
+  map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
 
   /** The name of the world. */
   name: string;
@@ -518,7 +518,7 @@ export default class World extends EventRouter implements protocol.Serializable 
    */
   public loadMap(
     map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string,
-    options: { spawnEntities?: boolean } = {},
+    options: { spawnEntities?: boolean, preferMapArtifacts?: boolean } = {},
   ) {
     if (typeof map === 'string') {
       map = WorldMapFileLoader.load(map);
@@ -526,12 +526,14 @@ export default class World extends EventRouter implements protocol.Serializable 
 
     // Auto-upgrade: if a legacy WorldMap was passed but compressed artifacts
     // exist at the conventional assets/ location, prefer those for faster loading.
-    if (!WorldMapCodec.isCompressedWorldMap(map) && !WorldMapChunkCacheCodec.isWorldMapChunkCache(map) && typeof map === 'object' && map !== null && 'blocks' in map) {
+    const preferMapArtifacts = options.preferMapArtifacts ?? true;
+    if (preferMapArtifacts && !WorldMapCodec.isCompressedWorldMap(map) && !WorldMapChunkCacheCodec.isWorldMapChunkCache(map) && typeof map === 'object' && map !== null && 'blocks' in map) {
       const basePath = path.resolve(process.cwd(), 'assets/map');
       const chunkCachePath = basePath + '.chunks.bin';
       const compressedPath = basePath + '.compressed.json';
+      const jsonPath = basePath + '.json';
 
-      if (fs.existsSync(chunkCachePath) || fs.existsSync(compressedPath)) {
+      if (fs.existsSync(jsonPath) && (fs.existsSync(chunkCachePath) || fs.existsSync(compressedPath))) {
         map = WorldMapFileLoader.load('assets/map.json');
       }
     }
