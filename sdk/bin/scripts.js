@@ -84,13 +84,19 @@ async function start() {
   const buildCmd = `hytopia build-dev ${inputFile}`;
   const runCmd = `"${process.execPath}" --enable-source-maps "${entryFile}"`;
 
+  // Auto-recompress map if stale before first build
+  autoRecompressMap();
+
   // Start nodemon to watch for changes, rebuild, then run the server
   nodemon({
     watch: ['.'],
-    ext: 'js,ts,html',
-    ignore: ['node_modules/**', '.git/**', '*.zip', outputFile, 'assets/**'],
+    ext: 'js,ts,html,json,bin',
+    ignore: ['node_modules/**', '.git/**', '*.zip', outputFile, 'assets/map.compressed.json', 'assets/map.chunks.bin'],
     exec: `${buildCmd} && ${runCmd}`,
     delay: 100,
+  })
+  .on('restart', () => {
+    autoRecompressMap();
   })
   .on('quit', () => {
     console.log('👋 Shutting down...');
@@ -495,6 +501,53 @@ async function packageProject() {
   
   // Finalize the archive
   archive.finalize();
+}
+
+/**
+ * Auto-recompress map if compressed artifacts are stale.
+ * Called by `hytopia start` before each build cycle.
+ * Only acts if compressed artifacts already exist (i.e. user has run map-compress before).
+ */
+function autoRecompressMap() {
+  const mapPath = path.resolve(process.cwd(), 'assets/map.json');
+  const compressedPath = path.resolve(process.cwd(), 'assets/map.compressed.json');
+  const chunkCachePath = path.resolve(process.cwd(), 'assets/map.chunks.bin');
+
+  if (!fs.existsSync(mapPath)) return;
+
+  const compressedExists = fs.existsSync(compressedPath);
+  const chunkCacheExists = fs.existsSync(chunkCachePath);
+  if (!compressedExists && !chunkCacheExists) return;
+
+  const mapMtime = fs.statSync(mapPath).mtimeMs;
+  const compressedMtime = compressedExists ? fs.statSync(compressedPath).mtimeMs : 0;
+
+  if (compressedMtime >= mapMtime) return;
+
+  console.log('📦 map.json changed — recompressing...');
+
+  try {
+    const rawText = fs.readFileSync(mapPath, 'utf-8');
+    const parsed = JSON.parse(rawText);
+
+    if (parsed && typeof parsed === 'object' && typeof parsed.data === 'string' && parsed.bounds) return;
+
+    const compressed = compressWorldMap(parsed, { algorithm: 'brotli', level: 9 });
+    const compressedJson = JSON.stringify(compressed);
+    const inputSize = Buffer.byteLength(rawText);
+    const compressedSize = Buffer.byteLength(compressedJson);
+
+    fs.writeFileSync(compressedPath, compressedJson);
+
+    const sha256 = crypto.createHash('sha256').update(compressedJson).digest('hex');
+    const chunkCacheBuffer = createChunkCache(compressed, { algorithm: 'brotli', level: 6, sourceSha256: sha256 });
+    fs.writeFileSync(chunkCachePath, chunkCacheBuffer);
+
+    const ratio = ((1 - (compressedSize / inputSize)) * 100).toFixed(1);
+    console.log(`   ✅ Recompressed: ${formatSize(compressedSize)} (${ratio}% smaller) + ${formatSize(chunkCacheBuffer.byteLength)} chunk cache`);
+  } catch (err) {
+    console.error(`   ⚠️ Auto-recompress failed: ${err.message}`);
+  }
 }
 
 /**
