@@ -449,3 +449,39 @@ If you want this PR to be mergeable as a framework (not just scaffolding), the s
 ### Naming/hygiene
 
 - This branch contains an internal notes folder name that should be renamed to a neutral label before merging.
+
+---
+
+## Test Coverage (What Was Actually Run)
+
+This section is a factual log of what was executed against the current PR #11 branch state.
+
+### Server runtime smoke test (engine boot + tick + bots)
+
+- Built `server/src/index.ts` with Bun and executed it with Node (local dev runtime).
+- Started the engine via `startServer(...)`.
+- Loaded `assets/release/maps/boilerplate-small.json`.
+- Enabled profiling with one line: `PerformanceMonitor.instance.enable({ snapshotIntervalMs: 0 })`.
+- Enabled per-entity profiling: `PerformanceMonitor.instance.enableEntityProfiling(true)`.
+- Spawned **25 bots** using `BotManager.instance.spawnBots(...)` with `RandomWalkBehavior`.
+- Observed ongoing `PerformanceMonitorEvent.TICK_REPORT` events and captured a snapshot after ~5s post-start:
+  - `avgTickMs=0.252`, `p95TickMs=0.382`, `p99TickMs=0.550`, `maxTickMs=12.509`, `ticksOverBudget=0`, `totalTicks=301` (0 players connected).
+
+### Bugs found during the smoke test
+
+- Bot spawning triggered recoverable runtime errors from `RigidBody.setEnabledRotations()` when bots use a non-dynamic rigid body type.
+  - Fixed by only applying `enabledRotations` when the bot rigid body type is `DYNAMIC`.
+
+### Client build check
+
+- `client` production build passed (`tsc` + `vite build`) after removing an unused local in `client/src/network/NetworkManager.ts`.
+
+### Not tested / not runnable end-to-end yet
+
+- No `sdk-examples/*` games were run.
+- No real client gameplay session was connected to the server (so join/reconnect chunk streaming and networking hot paths were not exercised).
+- `packages/perf-tools` CLI and GitHub Actions “perf gate” workflows were **not** run successfully as an end-to-end benchmark, because the tooling does not yet collect real server/client metrics and has install/runtime issues described above.
+
+### Environment limitations observed
+
+- WebTransport http3-quiche native addon was not available in this environment, so WebTransport/QUIC wasn’t exercised (server still started with fallback behavior).
