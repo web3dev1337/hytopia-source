@@ -185,7 +185,7 @@ blocks/BlockTextureAtlasManager.ts - Texture atlas generation
 blocks/utils.ts - Block utilities
 chunks/Chunk.ts - Client chunk state
 chunks/ChunkManager.ts - Chunk lifecycle (load/unload by distance)
-chunks/ChunkMeshManager.ts - Greedy meshing + AO for voxel geometry
+chunks/ChunkMeshManager.ts - Batch meshes from worker output (per-face meshing with face culling + AO on `master`)
 chunks/ChunkRegistry.ts - Chunk lookup
 chunks/ChunkConstants.ts - Chunk size constants
 chunks/ChunkStats.ts - Chunk performance stats
@@ -423,4 +423,4 @@ zombies-fps/ - Zombie FPS
 - **Dual transport** — WebTransport (QUIC) preferred, WebSocket fallback. Reliable stream + unreliable datagrams
 - **msgpackr serialization** — All packets serialized with msgpackr, large payloads gzip-compressed
 - **60 Hz physics / 30 Hz network** — Server physics ticks at 60 Hz, network sync flushes every 2 ticks
-- **Web Worker meshing** — Client offloads greedy meshing + AO to a dedicated Web Worker
+- **Web Worker meshing** — Client offloads chunk meshing + AO to a dedicated Web Worker (per-face meshing with face culling; no greedy quad merging on `master`)
