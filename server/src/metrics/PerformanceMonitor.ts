@@ -333,7 +333,7 @@ export default class PerformanceMonitor extends EventRouter {
   private _getOperationStats(): Record<string, OperationStats> {
     const result: Record<string, OperationStats> = {};
 
-    for (const [name, acc] of this._operations) {
+    for (const [ name, acc ] of this._operations) {
       const samples: number[] = [];
 
       for (let i = 0; i < acc.sampleCount; i++) {

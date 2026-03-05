@@ -1,38 +1,53 @@
 import PerformanceMonitor from '@/metrics/PerformanceMonitor';
 
-export function Monitor(operationName?: string) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
-    const originalMethod = descriptor.value;
-    const className = target.constructor.name;
-    const name = operationName ?? `${className}.${propertyKey}`;
+type AnyMethod = (...args: unknown[]) => unknown;
+type AnyConstructor = abstract new (...args: unknown[]) => unknown;
 
-    if (originalMethod.constructor.name === 'AsyncFunction') {
-      descriptor.value = async function (...args: any[]) {
+export function Monitor(operationName?: string): MethodDecorator {
+  return function <T>(
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<T>,
+  ): TypedPropertyDescriptor<T> | void {
+    const original = descriptor.value;
+
+    if (typeof original !== 'function') {
+      return descriptor;
+    }
+
+    const className = (target as { constructor?: { name?: string } }).constructor?.name ?? 'Unknown';
+    const name = operationName ?? `${className}.${String(propertyKey)}`;
+    const originalFn = original as unknown as AnyMethod;
+    const isAsync = originalFn.constructor.name === 'AsyncFunction';
+
+    const wrapped: AnyMethod = function (this: unknown, ...args: unknown[]) {
+      if (isAsync) {
         return PerformanceMonitor.instance.measureAsync(
           name,
-          () => originalMethod.apply(this, args),
+          () => (originalFn as (...fnArgs: unknown[]) => Promise<unknown>).apply(this, args),
         );
-      };
-    } else {
-      descriptor.value = function (...args: any[]) {
-        return PerformanceMonitor.instance.measure(
-          name,
-          () => originalMethod.apply(this, args),
-        );
-      };
-    }
+      }
+
+      return PerformanceMonitor.instance.measure(
+        name,
+        () => originalFn.apply(this, args),
+      );
+    };
+
+    descriptor.value = wrapped as unknown as T;
 
     return descriptor;
   };
 }
 
 export function MonitorClass(prefix?: string) {
-  return function <T extends { new(...args: any[]): {} }>(constructor: T) {
-    const prototype = constructor.prototype;
+  return function <TConstructor extends AnyConstructor>(constructor: TConstructor): TConstructor {
+    const prototype = (constructor as { prototype?: object }).prototype;
+
+    if (!prototype) {
+      return constructor;
+    }
+
     const classPrefix = prefix ?? constructor.name;
 
     for (const name of Object.getOwnPropertyNames(prototype)) {
@@ -40,10 +55,20 @@ export function MonitorClass(prefix?: string) {
 
       const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
 
-      if (descriptor && typeof descriptor.value === 'function') {
-        Monitor(`${classPrefix}.${name}`)(prototype, name, descriptor);
-        Object.defineProperty(prototype, name, descriptor);
+      if (!descriptor) {
+        continue;
       }
+
+      const value: unknown = descriptor.value;
+
+      if (typeof value !== 'function') {
+        continue;
+      }
+
+      const typedDescriptor = descriptor as TypedPropertyDescriptor<unknown>;
+
+      Monitor(`${classPrefix}.${name}`)(prototype, name, typedDescriptor);
+      Object.defineProperty(prototype, name, typedDescriptor);
     }
 
     return constructor;

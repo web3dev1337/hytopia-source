@@ -69,8 +69,12 @@ export default class CpuProfiler {
 
     let chunks = '';
 
-    session.on('HeapProfiler.addHeapSnapshotChunk', (m: any) => {
-      chunks += m.params.chunk;
+    session.on('HeapProfiler.addHeapSnapshotChunk', (message: unknown) => {
+      const chunk = (message as { params?: { chunk?: unknown } }).params?.chunk;
+
+      if (typeof chunk === 'string') {
+        chunks += chunk;
+      }
     });
 
     return new Promise((resolve, reject) => {

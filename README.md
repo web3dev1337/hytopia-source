@@ -48,7 +48,7 @@ The `Game` singleton owns all subsystem managers. Key systems:
 |---|---|
 | `NetworkManager` | WebTransport (HTTP/3) with WebSocket fallback. Deserializes msgpack packets and dispatches typed events |
 | `Renderer` | Three.js `WebGLRenderer` + `EffectComposer`. Post-processing: SMAA, selective bloom, outline pass, `CSS2DRenderer` for in-world UI |
-| `ChunkMeshManager` + `ChunkWorkerClient` | Voxel mesh generation via greedy meshing with ambient occlusion, offloaded to a Web Worker |
+| `ChunkMeshManager` + `ChunkWorkerClient` | Voxel mesh generation with face culling + ambient occlusion, offloaded to a Web Worker (no greedy quad merging) |
 | `EntityManager` | Entity lifecycle and GLTF model rendering |
 | `InputManager` + `MobileManager` | Keyboard/mouse/gamepad input and touch/joystick for mobile |
 | `UIManager` | HTML/CSS overlay UI system for game developer UIs and in-world `SceneUI` elements |

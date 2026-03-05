@@ -423,4 +423,4 @@ zombies-fps/ - Zombie FPS
 - **Dual transport** — WebTransport (QUIC) preferred, WebSocket fallback. Reliable stream + unreliable datagrams
 - **msgpackr serialization** — All packets serialized with msgpackr, large payloads gzip-compressed
 - **60 Hz physics / 30 Hz network** — Server physics ticks at 60 Hz, network sync flushes every 2 ticks
-- **Web Worker meshing** — Client offloads greedy meshing + AO to a dedicated Web Worker
+- **Web Worker meshing** — Client offloads face-culling meshing + AO to a dedicated Web Worker (no greedy quad merging)
