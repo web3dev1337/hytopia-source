@@ -1,0 +1,88 @@
+name: Update Performance Baseline
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'server/src/**'
+      - 'client/src/**'
+      - 'protocol/**'
+
+  workflow_dispatch:
+
+jobs:
+  update-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server dependencies
+        run: cd server && npm ci
+
+      - name: Build SDK
+        run: cd server && npm run build
+
+      - name: Install perf-tools
+        run: cd packages/perf-tools && npm ci && npm run build
+
+      - name: Run benchmarks (3 rounds, averaged)
+        run: |
+          mkdir -p .perf-baseline
+          for preset in idle stress; do
+            echo "=== Running ${preset} benchmark (3 rounds) ==="
+            for i in 1 2 3; do
+              cd packages/perf-tools
+              npx hytopia-bench run --preset ${preset} --output "../../.perf-baseline/${preset}-run${i}.json" --verbose || true
+              cd ../..
+            done
+          done
+
+      - name: Average baselines
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const dir = '.perf-baseline';
+            const presets = ['idle', 'stress'];
+            for (const preset of presets) {
+              const runs = [];
+              for (let i = 1; i <= 3; i++) {
+                const path = `${dir}/${preset}-run${i}.json`;
+                if (fs.existsSync(path)) {
+                  const data = JSON.parse(fs.readFileSync(path, 'utf-8'));
+                  if (data.baseline) runs.push(data.baseline);
+                }
+              }
+              if (runs.length === 0) continue;
+              const avg = {};
+              const keys = ['avgTickMs', 'maxTickMs', 'p95TickMs', 'p99TickMs', 'ticksOverBudgetPct', 'avgMemoryMb'];
+              for (const key of keys) {
+                const values = runs.map(r => r[key]).filter(v => v !== undefined);
+                avg[key] = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+              }
+              avg.operations = runs[0].operations || {};
+              fs.writeFileSync(`${dir}/${preset}.json`, JSON.stringify(avg, null, 2));
+              console.log(`${preset} baseline averaged from ${runs.length} runs`);
+            }
+
+      - name: Cache baseline
+        uses: actions/cache/save@v4
+        with:
+          path: .perf-baseline/
+          key: perf-baseline-master-${{ github.sha }}
+
+      - name: Also save as latest
+        uses: actions/cache/save@v4
+        with:
+          path: .perf-baseline/
+          key: perf-baseline-master

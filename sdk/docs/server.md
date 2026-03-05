@@ -108,6 +108,33 @@ When to use: registering and retrieving block types for a specific world. Do NOT
 </td></tr>
 <tr><td>
 
+[BotManager](./server.botmanager.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[BotPlayer](./server.botplayer.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[ChaseBehavior](./server.chasebehavior.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [ChatManager](./server.chatmanager.md)
 
 
@@ -168,6 +195,15 @@ When to use: defining collision shapes for rigid bodies or entities. Do NOT use 
 A helper class for building and decoding collision groups.
 
 When to use: creating custom collision filters for colliders and rigid bodies. Do NOT use for: per-frame changes; collision group changes are usually infrequent.
+
+
+</td></tr>
+<tr><td>
+
+[CpuProfiler](./server.cpuprofiler.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -290,6 +326,24 @@ When to use: accessing global managers and registries after startup. Do NOT use 
 </td></tr>
 <tr><td>
 
+[IdleBehavior](./server.idlebehavior.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[InteractBehavior](./server.interactbehavior.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [IterationMap](./server.iterationmap.md)
 
 
@@ -355,6 +409,15 @@ When to use: querying model metadata (bounds, node names, animations, trimesh). 
 </td></tr>
 <tr><td>
 
+[NetworkMetrics](./server.networkmetrics.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [ParticleEmitter](./server.particleemitter.md)
 
 
@@ -387,6 +450,15 @@ When to use: querying or bulk-cleaning particle emitters for a world. Do NOT use
 A pathfinding entity controller built on top of `SimpleEntityController`<!-- -->.
 
 When to use: obstacle-aware movement to a target coordinate. Do NOT use for: per-tick recalculation; pathfinding is synchronous and can be expensive.
+
+
+</td></tr>
+<tr><td>
+
+[PerformanceMonitor](./server.performancemonitor.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -478,6 +550,15 @@ When to use: showing overlays, HUDs, menus, and custom UI for a specific player.
 Represents a quaternion.
 
 When to use: rotation math for entities, cameras, or transforms. Do NOT use for: immutable math; most methods mutate the instance.
+
+
+</td></tr>
+<tr><td>
+
+[RandomWalkBehavior](./server.randomwalkbehavior.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -908,6 +989,15 @@ See `ParticleEmitterEventPayloads` for the payloads.
 </td></tr>
 <tr><td>
 
+[PerformanceMonitorEvent](./server.performancemonitorevent.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [PlayerCameraEvent](./server.playercameraevent.md)
 
 
@@ -1096,6 +1186,42 @@ Description
 
 </th></tr></thead>
 <tbody><tr><td>
+
+[Monitor(operationName)](./server.monitor.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[monitorAsyncBlock(name, fn)](./server.monitorasyncblock.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[monitorBlock(name, fn)](./server.monitorblock.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[MonitorClass(prefix)](./server.monitorclass.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
 
 [startServer(init)](./server.startserver.md)
 
@@ -1312,6 +1438,24 @@ Event payloads for BlockTypeRegistry emitted events.
 </td></tr>
 <tr><td>
 
+[BotBehavior](./server.botbehavior.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[BotPlayerOptions](./server.botplayeroptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [CapsuleColliderOptions](./server.capsulecollideroptions.md)
 
 
@@ -1322,6 +1466,15 @@ The options for a capsule collider.
 Use for: capsule-shaped colliders. Do NOT use for: other shapes; use the matching collider option type.
 
 \*\*Category:\*\* Physics
+
+
+</td></tr>
+<tr><td>
+
+[ChaseBehaviorOptions](./server.chasebehavioroptions.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -1519,6 +1672,15 @@ Event payloads for GameServer emitted events.
 </td></tr>
 <tr><td>
 
+[InteractBehaviorOptions](./server.interactbehavioroptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [KinematicPositionRigidBodyOptions](./server.kinematicpositionrigidbodyoptions.md)
 
 
@@ -1564,6 +1726,15 @@ Use for: entities rendered from a glTF model. Do NOT use for: block entities; us
 </td></tr>
 <tr><td>
 
+[NetworkMetricsSnapshot](./server.networkmetricssnapshot.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [NoneColliderOptions](./server.nonecollideroptions.md)
 
 
@@ -1574,6 +1745,15 @@ The options for an error type "none" collider.
 Use for: explicitly disabling collider creation. Do NOT use for: physical interactions; no collider will be created.
 
 \*\*Category:\*\* Physics
+
+
+</td></tr>
+<tr><td>
+
+[OperationStats](./server.operationstats.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -1615,6 +1795,33 @@ Options for creating a ParticleEmitter instance.
 Use for: configuring an emitter before calling `ParticleEmitter.spawn`<!-- -->. Do NOT use for: runtime updates after spawn; use `ParticleEmitter.set*` methods.
 
 \*\*Category:\*\* Particles
+
+
+</td></tr>
+<tr><td>
+
+[PerformanceMonitorEventPayloads](./server.performancemonitoreventpayloads.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[PerformanceMonitorOptions](./server.performancemonitoroptions.md)
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
+[PerformanceSnapshot](./server.performancesnapshot.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -1680,6 +1887,15 @@ Event payloads for PlayerUI emitted events.
 A quaternion.
 
 \*\*Category:\*\* Math
+
+
+</td></tr>
+<tr><td>
+
+[RandomWalkOptions](./server.randomwalkoptions.md)
+
+
+</td><td>
 
 
 </td></tr>
@@ -1762,6 +1978,15 @@ Event payloads for Simulation emitted events.
 A 3x3 symmetric positive-definite matrix for spatial dynamics.
 
 \*\*Category:\*\* Math
+
+
+</td></tr>
+<tr><td>
+
+[TickReport](./server.tickreport.md)
+
+
+</td><td>
 
 
 </td></tr>

@@ -514,12 +514,100 @@ export interface BlockTypeRegistryEventPayloads {
     };
 }
 
+// @public (undocumented)
+export interface BotBehavior {
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export class BotManager {
+    // (undocumented)
+    get botCount(): number;
+    // (undocumented)
+    despawnAll(): void;
+    // (undocumented)
+    despawnBot(id: number): void;
+    // (undocumented)
+    getAllBots(): BotPlayer[];
+    // (undocumented)
+    getBot(id: number): BotPlayer | undefined;
+    // (undocumented)
+    static get instance(): BotManager;
+    // (undocumented)
+    spawnBot(world: World, options?: BotPlayerOptions): BotPlayer;
+    // (undocumented)
+    spawnBots(world: World, count: number, options?: BotPlayerOptions): BotPlayer[];
+}
+
+// @public (undocumented)
+export class BotPlayer {
+    constructor(world: World, options?: BotPlayerOptions);
+    // (undocumented)
+    get controller(): SimpleEntityController;
+    // (undocumented)
+    despawn(): void;
+    // (undocumented)
+    readonly entity: Entity;
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    get isSpawned(): boolean;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    setBehavior(behavior: BotBehavior): void;
+    // (undocumented)
+    spawn(position?: Vector3Like): void;
+    // (undocumented)
+    teleport(position: Vector3Like): void;
+    // (undocumented)
+    get world(): World;
+}
+
+// @public (undocumented)
+export interface BotPlayerOptions {
+    // (undocumented)
+    behavior?: BotBehavior;
+    // (undocumented)
+    modelScale?: number;
+    // (undocumented)
+    modelUri?: string;
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    rigidBodyType?: RigidBodyType;
+    // (undocumented)
+    spawnPosition?: Vector3Like;
+}
+
 // @public
 export interface CapsuleColliderOptions extends BaseColliderOptions {
     halfHeight?: number;
     radius?: number;
     // (undocumented)
     shape: ColliderShape.CAPSULE;
+}
+
+// @public (undocumented)
+export class ChaseBehavior implements BotBehavior {
+    constructor(options?: ChaseBehaviorOptions);
+    // (undocumented)
+    readonly name = "chase";
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface ChaseBehaviorOptions {
+    // (undocumented)
+    chaseSpeed?: number;
+    // (undocumented)
+    detectionRadius?: number;
+    // (undocumented)
+    updateIntervalMs?: number;
 }
 
 // @public
@@ -862,6 +950,14 @@ export type ContactManifold = {
     localNormalB: Vector3Like;
     normal: Vector3Like;
 };
+
+// @public (undocumented)
+export class CpuProfiler {
+    // (undocumented)
+    static captureHeapSnapshot(outputPath?: string): Promise<string>;
+    // (undocumented)
+    static captureProfile(durationMs: number, outputPath?: string): Promise<object | null>;
+}
 
 // @public
 export interface CylinderColliderOptions extends BaseColliderOptions {
@@ -1608,6 +1704,33 @@ export interface GameServerEventPayloads {
     };
 }
 
+// @public (undocumented)
+export class IdleBehavior implements BotBehavior {
+    // (undocumented)
+    readonly name = "idle";
+    // (undocumented)
+    tick(_bot: BotPlayer, _world: World, _deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export class InteractBehavior implements BotBehavior {
+    constructor(options?: InteractBehaviorOptions);
+    // (undocumented)
+    readonly name = "interact";
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface InteractBehaviorOptions {
+    // (undocumented)
+    actionIntervalMs?: number;
+    // (undocumented)
+    interactRadius?: number;
+    // (undocumented)
+    moveSpeed?: number;
+}
+
 // @public
 export type IntersectionResult = {
     intersectedBlockType?: BlockType;
@@ -1780,6 +1903,20 @@ export type ModelTrimesh = {
     indices: Uint32Array;
 };
 
+// @public (undocumented)
+export function Monitor(operationName?: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => PropertyDescriptor;
+
+// @public (undocumented)
+export function monitorAsyncBlock<T>(name: string, fn: () => Promise<T>): Promise<T>;
+
+// @public (undocumented)
+export function monitorBlock<T>(name: string, fn: () => T): T;
+
+// @public (undocumented)
+export function MonitorClass(prefix?: string): <T extends {
+    new (...args: any[]): {};
+}>(constructor: T) => T;
+
 // @public
 export type MoveCallback = (currentPosition: Vector3Like, targetPosition: Vector3Like) => void;
 
@@ -1800,10 +1937,82 @@ export type MoveOptions = {
     moveCompletesWhenStuck?: boolean;
 };
 
+// @public (undocumented)
+export class NetworkMetrics {
+    // (undocumented)
+    disable(): void;
+    // (undocumented)
+    enable(): void;
+    // (undocumented)
+    getSnapshot(): NetworkMetricsSnapshot;
+    // (undocumented)
+    static get instance(): NetworkMetrics;
+    // (undocumented)
+    get isEnabled(): boolean;
+    // (undocumented)
+    recordBytesReceived(bytes: number): void;
+    // (undocumented)
+    recordBytesSent(bytes: number): void;
+    // (undocumented)
+    recordCompression(): void;
+    // (undocumented)
+    recordPacketReceived(): void;
+    // (undocumented)
+    recordPacketSent(): void;
+    // (undocumented)
+    recordSerialization(durationMs: number): void;
+    // (undocumented)
+    setConnectedPlayers(count: number): void;
+}
+
+// @public (undocumented)
+export interface NetworkMetricsSnapshot {
+    // (undocumented)
+    avgSerializationMs: number;
+    // (undocumented)
+    bytesReceivedPerSecond: number;
+    // (undocumented)
+    bytesReceivedTotal: number;
+    // (undocumented)
+    bytesSentPerSecond: number;
+    // (undocumented)
+    bytesSentTotal: number;
+    // (undocumented)
+    compressionCount: number;
+    // (undocumented)
+    connectedPlayers: number;
+    // (undocumented)
+    packetsReceivedPerSecond: number;
+    // (undocumented)
+    packetsSentPerSecond: number;
+}
+
 // @public
 export interface NoneColliderOptions extends BaseColliderOptions {
     // (undocumented)
     shape: ColliderShape.NONE;
+}
+
+// @public (undocumented)
+export interface OperationStats {
+    // (undocumented)
+    avgMs: number;
+    // (undocumented)
+    count: number;
+    // (undocumented)
+    lastMs: number;
+    // (undocumented)
+    maxMs: number;
+    // (undocumented)
+    minMs: number;
+    // (undocumented)
+    p50Ms: number;
+    // (undocumented)
+    p95Ms: number;
+    // (undocumented)
+    p99Ms: number;
+    // (undocumented)
+    totalMs: number;
 }
 
 // @public
@@ -2233,6 +2442,107 @@ export type PathfindingOptions = {
     waypointStoppingDistance?: number;
     waypointTimeoutMs?: number;
 };
+
+// @public (undocumented)
+export class PerformanceMonitor extends EventRouter {
+    // (undocumented)
+    beginTick(tick: number, entityCount: number, playerCount: number): void;
+    // (undocumented)
+    disable(): void;
+    // (undocumented)
+    enable(options?: PerformanceMonitorOptions): void;
+    // (undocumented)
+    enableEntityProfiling(enabled: boolean): void;
+    // (undocumented)
+    endTick(): void;
+    // (undocumented)
+    getEntityCosts(): Map<number, {
+        tickMs: number;
+        name: string;
+    }>;
+    // (undocumented)
+    getSnapshot(): PerformanceSnapshot;
+    // (undocumented)
+    static get instance(): PerformanceMonitor;
+    // (undocumented)
+    get isEnabled(): boolean;
+    // (undocumented)
+    get isEntityProfilingEnabled(): boolean;
+    // (undocumented)
+    measure<T>(name: string, fn: () => T): T;
+    // (undocumented)
+    measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T>;
+    // (undocumented)
+    recordEntityCost(entityId: number, name: string, tickMs: number): void;
+    // (undocumented)
+    recordPhase(phaseName: string, durationMs: number): void;
+    // (undocumented)
+    resetStats(): void;
+    // (undocumented)
+    startTiming(name: string): () => void;
+}
+
+// @public (undocumented)
+export enum PerformanceMonitorEvent {
+    // (undocumented)
+    SNAPSHOT = "PERFORMANCE_MONITOR.SNAPSHOT",
+    // (undocumented)
+    SPIKE_DETECTED = "PERFORMANCE_MONITOR.SPIKE_DETECTED",
+    // (undocumented)
+    TICK_REPORT = "PERFORMANCE_MONITOR.TICK_REPORT"
+}
+
+// @public (undocumented)
+export interface PerformanceMonitorEventPayloads {
+    // (undocumented)
+    [PerformanceMonitorEvent.SNAPSHOT]: PerformanceSnapshot;
+    // (undocumented)
+    [PerformanceMonitorEvent.SPIKE_DETECTED]: TickReport;
+    // (undocumented)
+    [PerformanceMonitorEvent.TICK_REPORT]: TickReport;
+}
+
+// @public (undocumented)
+export interface PerformanceMonitorOptions {
+    // (undocumented)
+    historySize?: number;
+    // (undocumented)
+    snapshotIntervalMs?: number;
+    // (undocumented)
+    spikeThresholdMs?: number;
+    // (undocumented)
+    tickBudgetMs?: number;
+}
+
+// @public (undocumented)
+export interface PerformanceSnapshot {
+    // (undocumented)
+    avgTickMs: number;
+    // (undocumented)
+    budgetMs: number;
+    // (undocumented)
+    maxTickMs: number;
+    // (undocumented)
+    memory: {
+        heapUsedMb: number;
+        heapTotalMb: number;
+        rssMb: number;
+    };
+    // (undocumented)
+    operations: Record<string, OperationStats>;
+    // (undocumented)
+    p95TickMs: number;
+    // (undocumented)
+    p99TickMs: number;
+    // (undocumented)
+    tickRate: number;
+    // (undocumented)
+    ticksOverBudget: number;
+    // (undocumented)
+    totalTicks: number;
+    // (undocumented)
+    uptimeMs: number;
+}
 
 // @public
 export class PersistenceManager {
@@ -2727,6 +3037,25 @@ export interface QuaternionLike {
     z: number;
 }
 
+// @public (undocumented)
+export class RandomWalkBehavior implements BotBehavior {
+    constructor(options?: RandomWalkOptions);
+    // (undocumented)
+    readonly name = "random_walk";
+    // (undocumented)
+    tick(bot: BotPlayer, _world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface RandomWalkOptions {
+    // (undocumented)
+    changeDirectionIntervalMs?: number;
+    // (undocumented)
+    moveRadius?: number;
+    // (undocumented)
+    moveSpeed?: number;
+}
+
 // @public
 export type RawCollider = RAPIER.Collider;
 
@@ -3133,6 +3462,26 @@ export class Ticker {
     start(): void;
     stop(): void;
     get targetTicksPerSecond(): number;
+}
+
+// @public (undocumented)
+export interface TickReport {
+    // (undocumented)
+    budgetMs: number;
+    // (undocumented)
+    budgetPercent: number;
+    // (undocumented)
+    durationMs: number;
+    // (undocumented)
+    entityCount: number;
+    // (undocumented)
+    heapUsedMb: number;
+    // (undocumented)
+    phases: Record<string, number>;
+    // (undocumented)
+    playerCount: number;
+    // (undocumented)
+    tick: number;
 }
 
 // @public

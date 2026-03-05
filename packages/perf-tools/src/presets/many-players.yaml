@@ -1,0 +1,21 @@
+name: "many-players"
+description: "Simulates 50 headless clients connecting to stress network and serialization"
+clients: 50
+warmupMs: 10000
+phases:
+  - name: connect-clients
+    duration: 10s
+  - name: spawn-bots
+    actions:
+      - type: spawn_bots
+        count: 50
+        behavior: random_walk
+  - name: measure
+    duration: 60s
+    collect: true
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 25
+  network:
+    maxBytesPerSecond: 10000000

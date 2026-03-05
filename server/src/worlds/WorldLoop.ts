@@ -1,5 +1,6 @@
 import ErrorHandler from '@/errors/ErrorHandler';
 import EventRouter from '@/events/EventRouter';
+import PerformanceMonitor from '@/metrics/PerformanceMonitor';
 import PlayerManager from '@/players/PlayerManager';
 import Telemetry, { TelemetrySpanOperation } from '@/metrics/Telemetry';
 import Ticker from '@/shared/classes/Ticker';
@@ -153,6 +154,16 @@ export default class WorldLoop extends EventRouter {
     });
 
     const tickStart = performance.now();
+    const perfMon = PerformanceMonitor.instance;
+    const profiling = perfMon.isEnabled;
+
+    if (profiling) {
+      perfMon.beginTick(
+        this._currentTick,
+        this._world.entityManager.entityCount,
+        PlayerManager.instance.playerCount,
+      );
+    }
 
     Telemetry.startSpan({
       operation: TelemetrySpanOperation.WORLD_TICK,
@@ -167,24 +178,38 @@ export default class WorldLoop extends EventRouter {
         worldLoopTick: this._currentTick,
       },
     }, () => {
+      let phaseStart: number;
+
+      phaseStart = profiling ? performance.now() : 0;
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.ENTITIES_TICK,
       }, () => this._world.entityManager.tickEntities(tickDeltaMs));
-      
+      if (profiling) perfMon.recordPhase('entities_tick', performance.now() - phaseStart);
+
+      phaseStart = profiling ? performance.now() : 0;
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.SIMULATION_STEP,
       }, () => this._world.simulation.step(tickDeltaMs));
-      
+      if (profiling) perfMon.recordPhase('simulation_step', performance.now() - phaseStart);
+
+      phaseStart = profiling ? performance.now() : 0;
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.ENTITIES_EMIT_UPDATES,
       }, () => this._world.entityManager.checkAndEmitUpdates());
-      
+      if (profiling) perfMon.recordPhase('entities_emit_updates', performance.now() - phaseStart);
+
       if (this._world.networkSynchronizer.shouldSynchronize()) {
+        phaseStart = profiling ? performance.now() : 0;
         Telemetry.startSpan({
           operation: TelemetrySpanOperation.NETWORK_SYNCHRONIZE,
         }, () => this._world.networkSynchronizer.synchronize());
+        if (profiling) perfMon.recordPhase('network_synchronize', performance.now() - phaseStart);
       }
     });
+
+    if (profiling) {
+      perfMon.endTick();
+    }
 
     this._currentTick++;
 

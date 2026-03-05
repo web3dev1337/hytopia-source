@@ -1461,6 +1461,50 @@ export declare interface BlockTypeRegistryEventPayloads {
     };
 }
 
+export declare interface BotBehavior {
+    name: string;
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+export declare class BotManager {
+    private static _instance;
+    static get instance(): BotManager;
+    private _bots;
+    get botCount(): number;
+    spawnBot(world: World, options?: BotPlayerOptions): BotPlayer;
+    spawnBots(world: World, count: number, options?: BotPlayerOptions): BotPlayer[];
+    getBot(id: number): BotPlayer | undefined;
+    getAllBots(): BotPlayer[];
+    despawnBot(id: number): void;
+    despawnAll(): void;
+}
+
+export declare class BotPlayer {
+    readonly id: number;
+    readonly entity: Entity;
+    readonly name: string;
+    private _behavior;
+    private _world;
+    private _spawned;
+    constructor(world: World, options?: BotPlayerOptions);
+    get isSpawned(): boolean;
+    get world(): World;
+    get controller(): SimpleEntityController;
+    setBehavior(behavior: BotBehavior): void;
+    spawn(position?: Vector3Like): void;
+    teleport(position: Vector3Like): void;
+    despawn(): void;
+}
+
+export declare interface BotPlayerOptions {
+    name?: string;
+    behavior?: BotBehavior;
+    spawnPosition?: Vector3Like;
+    modelUri?: string;
+    modelScale?: number;
+    rigidBodyType?: RigidBodyType;
+}
+
 /**
  * The options for a capsule collider. @public
  *
@@ -1483,6 +1527,22 @@ export declare interface CapsuleColliderOptions extends BaseColliderOptions {
      * **Category:** Physics
      */
     radius?: number;
+}
+
+export declare class ChaseBehavior implements BotBehavior {
+    readonly name = "chase";
+    private _chaseSpeed;
+    private _detectionRadius;
+    private _updateIntervalMs;
+    private _elapsed;
+    constructor(options?: ChaseBehaviorOptions);
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+export declare interface ChaseBehaviorOptions {
+    chaseSpeed?: number;
+    detectionRadius?: number;
+    updateIntervalMs?: number;
 }
 
 /**
@@ -2646,6 +2706,11 @@ export declare type ContactManifold = {
     /** The normal vector of the contact. */
     normal: Vector3Like;
 };
+
+export declare class CpuProfiler {
+    static captureProfile(durationMs: number, outputPath?: string): Promise<object | null>;
+    static captureHeapSnapshot(outputPath?: string): Promise<string>;
+}
 
 /**
  * The options for a cylinder collider. @public
@@ -5115,6 +5180,32 @@ export declare interface GameServerEventPayloads {
     };
 }
 
+export declare class IdleBehavior implements BotBehavior {
+    readonly name = "idle";
+    tick(_bot: BotPlayer, _world: World, _deltaTimeMs: number): void;
+}
+
+export declare class InteractBehavior implements BotBehavior {
+    readonly name = "interact";
+    private _interactRadius;
+    private _actionIntervalMs;
+    private _moveSpeed;
+    private _elapsed;
+    private _moveElapsed;
+    private _originX;
+    private _originZ;
+    private _originSet;
+    constructor(options?: InteractBehaviorOptions);
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+    private _moveToRandom;
+}
+
+export declare interface InteractBehaviorOptions {
+    interactRadius?: number;
+    actionIntervalMs?: number;
+    moveSpeed?: number;
+}
+
 /**
  * An intersection result.
  *
@@ -6121,6 +6212,16 @@ export declare type ModelTrimesh = {
     indices: Uint32Array;
 };
 
+export declare function Monitor(operationName?: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => PropertyDescriptor;
+
+export declare function monitorAsyncBlock<T>(name: string, fn: () => Promise<T>): Promise<T>;
+
+export declare function monitorBlock<T>(name: string, fn: () => T): T;
+
+export declare function MonitorClass(prefix?: string): <T extends {
+    new (...args: any[]): {};
+}>(constructor: T) => T;
+
 /**
  * Callback invoked as the entity moves toward a target coordinate.
  *
@@ -6170,6 +6271,49 @@ export declare type MoveOptions = {
     moveCompletesWhenStuck?: boolean;
 };
 
+export declare class NetworkMetrics {
+    private static _instance;
+    static get instance(): NetworkMetrics;
+    private _enabled;
+    private _bytesSentTotal;
+    private _bytesReceivedTotal;
+    private _packetsSentTotal;
+    private _packetsReceivedTotal;
+    private _compressionCount;
+    private _serializationTotalMs;
+    private _serializationCount;
+    private _lastSnapshotTime;
+    private _lastBytesSent;
+    private _lastBytesReceived;
+    private _lastPacketsSent;
+    private _lastPacketsReceived;
+    private _connectedPlayers;
+    get isEnabled(): boolean;
+    enable(): void;
+    disable(): void;
+    setConnectedPlayers(count: number): void;
+    recordBytesSent(bytes: number): void;
+    recordBytesReceived(bytes: number): void;
+    recordPacketSent(): void;
+    recordPacketReceived(): void;
+    recordSerialization(durationMs: number): void;
+    recordCompression(): void;
+    getSnapshot(): NetworkMetricsSnapshot;
+    private _reset;
+}
+
+export declare interface NetworkMetricsSnapshot {
+    connectedPlayers: number;
+    bytesSentTotal: number;
+    bytesReceivedTotal: number;
+    bytesSentPerSecond: number;
+    bytesReceivedPerSecond: number;
+    packetsSentPerSecond: number;
+    packetsReceivedPerSecond: number;
+    avgSerializationMs: number;
+    compressionCount: number;
+}
+
 /**
  * The options for an error type "none" collider. @public
  *
@@ -6180,6 +6324,18 @@ export declare type MoveOptions = {
  */
 export declare interface NoneColliderOptions extends BaseColliderOptions {
     shape: ColliderShape.NONE;
+}
+
+export declare interface OperationStats {
+    count: number;
+    totalMs: number;
+    avgMs: number;
+    minMs: number;
+    maxMs: number;
+    lastMs: number;
+    p50Ms: number;
+    p95Ms: number;
+    p99Ms: number;
 }
 
 /**
@@ -7183,6 +7339,90 @@ export declare type PathfindingOptions = {
     /** The timeout in milliseconds for a waypoint to be considered reached. Defaults to 2000ms divided by the speed of the entity. */
     waypointTimeoutMs?: number;
 };
+
+export declare class PerformanceMonitor extends EventRouter {
+    private static _instance;
+    static get instance(): PerformanceMonitor;
+    private _enabled;
+    private _entityProfilingEnabled;
+    private _spikeThresholdMs;
+    private _tickBudgetMs;
+    private _snapshotIntervalMs;
+    private _startTime;
+    private _operations;
+    private _tickDurations;
+    private _tickIndex;
+    private _tickCount;
+    private _ticksOverBudget;
+    private _maxTickMs;
+    private _totalTicks;
+    private _currentTick;
+    private _currentTickStart;
+    private _currentPhases;
+    private _currentEntityCount;
+    private _currentPlayerCount;
+    private _entityCosts;
+    private _snapshotTimer;
+    private constructor();
+    get isEnabled(): boolean;
+    get isEntityProfilingEnabled(): boolean;
+    enable(options?: PerformanceMonitorOptions): void;
+    disable(): void;
+    enableEntityProfiling(enabled: boolean): void;
+    measure<T>(name: string, fn: () => T): T;
+    measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T>;
+    startTiming(name: string): () => void;
+    beginTick(tick: number, entityCount: number, playerCount: number): void;
+    recordPhase(phaseName: string, durationMs: number): void;
+    endTick(): void;
+    recordEntityCost(entityId: number, name: string, tickMs: number): void;
+    getEntityCosts(): Map<number, {
+        tickMs: number;
+        name: string;
+    }>;
+    getSnapshot(): PerformanceSnapshot;
+    resetStats(): void;
+    private _recordOperation;
+    private _getTickSamples;
+    private _getOperationStats;
+}
+
+export declare enum PerformanceMonitorEvent {
+    TICK_REPORT = "PERFORMANCE_MONITOR.TICK_REPORT",
+    SPIKE_DETECTED = "PERFORMANCE_MONITOR.SPIKE_DETECTED",
+    SNAPSHOT = "PERFORMANCE_MONITOR.SNAPSHOT"
+}
+
+export declare interface PerformanceMonitorEventPayloads {
+    [PerformanceMonitorEvent.TICK_REPORT]: TickReport;
+    [PerformanceMonitorEvent.SPIKE_DETECTED]: TickReport;
+    [PerformanceMonitorEvent.SNAPSHOT]: PerformanceSnapshot;
+}
+
+export declare interface PerformanceMonitorOptions {
+    spikeThresholdMs?: number;
+    tickBudgetMs?: number;
+    snapshotIntervalMs?: number;
+    historySize?: number;
+}
+
+export declare interface PerformanceSnapshot {
+    uptimeMs: number;
+    tickRate: number;
+    avgTickMs: number;
+    maxTickMs: number;
+    p95TickMs: number;
+    p99TickMs: number;
+    ticksOverBudget: number;
+    totalTicks: number;
+    budgetMs: number;
+    operations: Record<string, OperationStats>;
+    memory: {
+        heapUsedMb: number;
+        heapTotalMb: number;
+        rssMb: number;
+    };
+}
 
 /**
  * Manages persistence of player and global data.
@@ -8823,6 +9063,26 @@ export declare interface QuaternionLike {
     y: number;
     z: number;
     w: number;
+}
+
+export declare class RandomWalkBehavior implements BotBehavior {
+    readonly name = "random_walk";
+    private _moveRadius;
+    private _moveSpeed;
+    private _changeIntervalMs;
+    private _elapsed;
+    private _originX;
+    private _originZ;
+    private _originSet;
+    constructor(options?: RandomWalkOptions);
+    tick(bot: BotPlayer, _world: World, deltaTimeMs: number): void;
+    private _pickNewTarget;
+}
+
+export declare interface RandomWalkOptions {
+    moveRadius?: number;
+    moveSpeed?: number;
+    changeDirectionIntervalMs?: number;
 }
 
 /**
@@ -10491,6 +10751,17 @@ export declare type TelemetrySpanOptions = {
     /** Additional attributes to attach to the span for context. */
     attributes?: Record<string, string | number>;
 };
+
+export declare interface TickReport {
+    tick: number;
+    durationMs: number;
+    budgetMs: number;
+    budgetPercent: number;
+    phases: Record<string, number>;
+    entityCount: number;
+    playerCount: number;
+    heapUsedMb: number;
+}
 
 /**
  * The options for a trimesh collider. @public

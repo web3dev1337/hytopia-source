@@ -1,0 +1,14 @@
+name: "idle-baseline"
+description: "Empty server baseline - measures overhead of the engine with no game logic"
+phases:
+  - name: warmup
+    duration: 5s
+  - name: measure
+    duration: 30s
+    collect: true
+thresholds:
+  tick_duration_ms:
+    avg: 2
+    p99: 5
+  memory_mb:
+    max: 200
