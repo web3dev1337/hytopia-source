@@ -5,10 +5,12 @@ import crypto from 'crypto';
 import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
-import zlib from 'zlib';
 import nodemon from 'nodemon';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
+
+// Lazy-loaded SDK module (loaded once on first use from ../server.mjs)
+let _sdk = null;
 
 // Store command-line flags
 const flags = {};
@@ -85,7 +87,7 @@ async function start() {
   const runCmd = `"${process.execPath}" --enable-source-maps "${entryFile}"`;
 
   // Auto-recompress map if stale before first build
-  autoRecompressMap();
+  await autoRecompressMap();
 
   // Start nodemon to watch for changes, rebuild, then run the server
   nodemon({
@@ -96,7 +98,7 @@ async function start() {
     delay: 100,
   })
   .on('restart', () => {
-    autoRecompressMap();
+    autoRecompressMap().catch(() => {});
   })
   .on('quit', () => {
     console.log('👋 Shutting down...');
@@ -503,48 +505,74 @@ async function packageProject() {
   archive.finalize();
 }
 
+async function getSDK() {
+  if (!_sdk) {
+    const sdkPath = path.resolve(__dirname, '..', 'server.mjs');
+    _sdk = await import(sdkPath);
+  }
+  return _sdk;
+}
+
+function getSDKSync() {
+  if (!_sdk) throw new Error('SDK not loaded — call await getSDK() first');
+  return _sdk;
+}
+
+function generateArtifacts(worldMap, options = {}) {
+  const sdk = getSDKSync();
+  return sdk.WorldMapArtifactsGenerator.create(worldMap, {
+    compressed: { algorithm: options.algorithm || 'brotli', level: options.level ?? 9 },
+    chunkCache: { algorithm: options.algorithm || 'brotli', level: options.cacheLevel ?? 6 },
+  });
+}
+
+function isCompressedMap(parsed) {
+  return parsed && typeof parsed === 'object' &&
+    typeof parsed.data === 'string' && parsed.bounds &&
+    typeof parsed.bounds.minX === 'number';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
 /**
  * Auto-recompress map if compressed artifacts are stale.
  * Called by `hytopia start` before each build cycle.
  * Only acts if compressed artifacts already exist (i.e. user has run map-compress before).
  */
-function autoRecompressMap() {
+async function autoRecompressMap() {
   const mapPath = path.resolve(process.cwd(), 'assets/map.json');
   const compressedPath = path.resolve(process.cwd(), 'assets/map.compressed.json');
   const chunkCachePath = path.resolve(process.cwd(), 'assets/map.chunks.bin');
 
   if (!fs.existsSync(mapPath)) return;
-
-  const compressedExists = fs.existsSync(compressedPath);
-  const chunkCacheExists = fs.existsSync(chunkCachePath);
-  if (!compressedExists && !chunkCacheExists) return;
+  if (!fs.existsSync(compressedPath) && !fs.existsSync(chunkCachePath)) return;
 
   const mapMtime = fs.statSync(mapPath).mtimeMs;
-  const compressedMtime = compressedExists ? fs.statSync(compressedPath).mtimeMs : 0;
-
+  const compressedMtime = fs.existsSync(compressedPath) ? fs.statSync(compressedPath).mtimeMs : 0;
   if (compressedMtime >= mapMtime) return;
 
   console.log('📦 map.json changed — recompressing...');
 
   try {
+    await getSDK();
     const rawText = fs.readFileSync(mapPath, 'utf-8');
     const parsed = JSON.parse(rawText);
+    if (isCompressedMap(parsed)) return;
 
-    if (parsed && typeof parsed === 'object' && typeof parsed.data === 'string' && parsed.bounds) return;
-
-    const compressed = compressWorldMap(parsed, { algorithm: 'brotli', level: 9 });
-    const compressedJson = JSON.stringify(compressed);
     const inputSize = Buffer.byteLength(rawText);
-    const compressedSize = Buffer.byteLength(compressedJson);
+    const artifacts = generateArtifacts(parsed);
 
-    fs.writeFileSync(compressedPath, compressedJson);
+    fs.writeFileSync(compressedPath, artifacts.compressedMapJson);
+    fs.writeFileSync(chunkCachePath, artifacts.chunkCacheBuffer);
 
-    const sha256 = crypto.createHash('sha256').update(compressedJson).digest('hex');
-    const chunkCacheBuffer = createChunkCache(compressed, { algorithm: 'brotli', level: 6, sourceSha256: sha256 });
-    fs.writeFileSync(chunkCachePath, chunkCacheBuffer);
-
+    const compressedSize = Buffer.byteLength(artifacts.compressedMapJson);
     const ratio = ((1 - (compressedSize / inputSize)) * 100).toFixed(1);
-    console.log(`   ✅ Recompressed: ${formatSize(compressedSize)} (${ratio}% smaller) + ${formatSize(chunkCacheBuffer.byteLength)} chunk cache`);
+    console.log(`   ✅ Recompressed: ${formatSize(compressedSize)} (${ratio}% smaller) + ${formatSize(artifacts.chunkCacheBuffer.byteLength)} chunk cache`);
   } catch (err) {
     console.error(`   ⚠️ Auto-recompress failed: ${err.message}`);
   }
@@ -581,7 +609,6 @@ async function mapCompress() {
     process.exit(1);
   }
 
-  // Derive output paths from input path
   const basePath = absoluteMapPath.endsWith('.json')
     ? absoluteMapPath.slice(0, -'.json'.length)
     : absoluteMapPath;
@@ -590,17 +617,11 @@ async function mapCompress() {
 
   console.log(`📦 Compressing map: ${mapPath}`);
 
-  // Read and parse input
   const rawText = fs.readFileSync(absoluteMapPath, 'utf-8');
   const inputSize = Buffer.byteLength(rawText);
   const parsed = JSON.parse(rawText);
 
-  // Detect format
-  const isCompressed = parsed && typeof parsed === 'object' &&
-    typeof parsed.data === 'string' && parsed.bounds &&
-    typeof parsed.bounds.minX === 'number';
-
-  if (isCompressed) {
+  if (isCompressedMap(parsed)) {
     console.error('❌ Input file is already a compressed map. Provide the original map.json.');
     process.exit(1);
   }
@@ -609,11 +630,13 @@ async function mapCompress() {
   const blockCount = Object.keys(blocks).length;
   console.log(`   Input: ${formatSize(inputSize)} (${blockCount.toLocaleString()} blocks)`);
 
-  // Compress the map
+  await getSDK();
+  const sdk = getSDKSync();
+
   const compressStart = performance.now();
-  const compressed = compressWorldMap(parsed, { algorithm, level });
+  const compressedMap = sdk.WorldMapCodec.compress(parsed, { algorithm, level });
   const compressMs = performance.now() - compressStart;
-  const compressedJson = JSON.stringify(compressed);
+  const compressedJson = JSON.stringify(compressedMap);
   const compressedSize = Buffer.byteLength(compressedJson);
 
   fs.writeFileSync(compressedOutPath, compressedJson);
@@ -621,17 +644,15 @@ async function mapCompress() {
   console.log(`   Compressed: ${formatSize(compressedSize)} (${ratio}% smaller) [${compressMs.toFixed(0)}ms]`);
   console.log(`   ✅ ${path.relative(process.cwd(), compressedOutPath)}`);
 
-  // Generate chunk cache
   if (!noChunkCache) {
     const sha256 = crypto.createHash('sha256').update(compressedJson).digest('hex');
 
     const cacheStart = performance.now();
-    const chunkCacheBuffer = createChunkCache(compressed, {
-      algorithm,
-      level: cacheLevel,
-      sourceSha256: sha256,
+    const chunkCache = sdk.WorldMapChunkCacheCodec.create(compressedMap, {
+      algorithm, level: cacheLevel, sourceSha256: sha256,
     });
     const cacheMs = performance.now() - cacheStart;
+    const chunkCacheBuffer = Buffer.from(chunkCache.data, 'base64');
 
     fs.writeFileSync(chunkCacheOutPath, chunkCacheBuffer);
     console.log(`   Chunk cache: ${formatSize(chunkCacheBuffer.byteLength)} [${cacheMs.toFixed(0)}ms]`);
@@ -641,255 +662,6 @@ async function mapCompress() {
   logDivider();
   console.log('Done! Your game will automatically use these files when the');
   console.log('SDK detects them alongside your map.json.');
-}
-
-// -- map-compress codec helpers (self-contained, no server.mjs import) --
-
-function compressWorldMap(map, options = {}) {
-  const blocks = map.blocks || {};
-  const entries = [];
-
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  let hasRotations = false;
-
-  for (const key in blocks) {
-    const val = blocks[key];
-    const id = typeof val === 'number' ? val : val.i;
-    const r = typeof val === 'number' ? 0 : (val.r || 0);
-    if (r !== 0) hasRotations = true;
-
-    const i1 = key.indexOf(',');
-    const i2 = key.indexOf(',', i1 + 1);
-    const x = Number(key.slice(0, i1));
-    const y = Number(key.slice(i1 + 1, i2));
-    const z = Number(key.slice(i2 + 1));
-
-    minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
-    maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
-    entries.push({ x, y, z, id, r });
-  }
-
-  if (entries.length === 0) {
-    const empty = Buffer.allocUnsafe(4);
-    empty.writeUInt32LE(0, 0);
-    return {
-      format: 'hytopia.worldmap.compressed', codecVersion: 1, version: '1.0.0',
-      algorithm: options.algorithm || 'brotli',
-      data: compressBuffer(options.algorithm || 'brotli', empty, options.level || 9).toString('base64'),
-      bounds: { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 0, maxZ: 0 },
-      blockTypes: map.blockTypes, entities: map.entities,
-      options: { rotations: false, useDelta: true, useVarint: true },
-    };
-  }
-
-  const includeRotations = options.includeRotations !== undefined ? options.includeRotations : hasRotations;
-
-  for (const b of entries) { b.x -= minX; b.y -= minY; b.z -= minZ; }
-  entries.sort((a, b) => a.y - b.y || a.x - b.x || a.z - b.z);
-
-  const budget = includeRotations ? 25 : 20;
-  const buffer = Buffer.allocUnsafe(4 + entries.length * budget);
-  let offset = 0;
-  buffer.writeUInt32LE(entries.length, offset); offset += 4;
-
-  let lastX = 0, lastY = 0, lastZ = 0;
-  for (const b of entries) {
-    offset = writeSignedVarint(buffer, offset, b.x - lastX);
-    offset = writeSignedVarint(buffer, offset, b.y - lastY);
-    offset = writeSignedVarint(buffer, offset, b.z - lastZ);
-    offset = writeSignedVarint(buffer, offset, b.id);
-    if (includeRotations) offset = writeSignedVarint(buffer, offset, b.r);
-    lastX = b.x; lastY = b.y; lastZ = b.z;
-  }
-
-  const algo = options.algorithm || 'brotli';
-  const lvl = options.level || 9;
-
-  return {
-    format: 'hytopia.worldmap.compressed', codecVersion: 1, version: '1.0.0',
-    algorithm: algo,
-    data: compressBuffer(algo, buffer.subarray(0, offset), lvl).toString('base64'),
-    bounds: { minX, minY, minZ, maxX, maxY, maxZ },
-    blockTypes: map.blockTypes, entities: map.entities,
-    options: { rotations: includeRotations, useDelta: true, useVarint: true },
-  };
-}
-
-function createChunkCache(compressedMap, options = {}) {
-  const CHUNK_SIZE = 16;
-  const CHUNK_VOLUME = CHUNK_SIZE ** 3;
-  const CHUNK_SIZE_BITS = 4; // log2(16)
-  const CHUNK_AXES_RANGE = 15;
-
-  const algo = compressedMap.algorithm || 'brotli';
-  const includeRotations = compressedMap.options?.rotations === true;
-  const compressedBuffer = Buffer.from(compressedMap.data, 'base64');
-  const decompressed = decompressBuffer(algo, compressedBuffer);
-
-  const bounds = compressedMap.bounds;
-  let readOffset = 0;
-  const blockCount = decompressed.readUInt32LE(readOffset); readOffset += 4;
-
-  const chunksByKey = new Map();
-  let hasRotations = false;
-  let lastX = 0, lastY = 0, lastZ = 0;
-
-  for (let i = 0; i < blockCount; i++) {
-    let r = readVarintFromBuf(decompressed, readOffset);
-    lastX += decodeZigzag(r.value); readOffset = r.offset;
-    r = readVarintFromBuf(decompressed, readOffset);
-    lastY += decodeZigzag(r.value); readOffset = r.offset;
-    r = readVarintFromBuf(decompressed, readOffset);
-    lastZ += decodeZigzag(r.value); readOffset = r.offset;
-    r = readVarintFromBuf(decompressed, readOffset);
-    const blockTypeId = decodeZigzag(r.value); readOffset = r.offset;
-
-    let rotIdx = 0;
-    if (includeRotations) {
-      r = readVarintFromBuf(decompressed, readOffset);
-      rotIdx = decodeZigzag(r.value); readOffset = r.offset;
-    }
-
-    const gx = lastX + bounds.minX;
-    const gy = lastY + bounds.minY;
-    const gz = lastZ + bounds.minZ;
-
-    const ox = Math.floor(gx / CHUNK_SIZE) * CHUNK_SIZE;
-    const oy = Math.floor(gy / CHUNK_SIZE) * CHUNK_SIZE;
-    const oz = Math.floor(gz / CHUNK_SIZE) * CHUNK_SIZE;
-    const chunkKey = `${ox},${oy},${oz}`;
-
-    let chunk = chunksByKey.get(chunkKey);
-    if (!chunk) {
-      chunk = { ox, oy, oz, blocks: new Uint8Array(CHUNK_VOLUME), rots: new Map() };
-      chunksByKey.set(chunkKey, chunk);
-    }
-
-    const lx = ((gx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const ly = ((gy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const lz = ((gz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const blockIndex = lx + (ly << CHUNK_SIZE_BITS) + (lz << (CHUNK_SIZE_BITS * 2));
-
-    chunk.blocks[blockIndex] = blockTypeId;
-    if (rotIdx !== 0) { chunk.rots.set(blockIndex, rotIdx); hasRotations = true; }
-  }
-
-  const rotationsEnabled = includeRotations && hasRotations;
-  const metadata = {
-    blockTypes: compressedMap.blockTypes ? (Array.isArray(compressedMap.blockTypes) ? compressedMap.blockTypes : Object.values(compressedMap.blockTypes)) : undefined,
-    entities: compressedMap.entities,
-    options: { rotations: rotationsEnabled },
-    source: options.sourceSha256 ? { sha256: options.sourceSha256 } : undefined,
-  };
-  const metadataJson = Buffer.from(JSON.stringify(metadata), 'utf8');
-
-  const chunks = Array.from(chunksByKey.values());
-  chunks.sort((a, b) => a.oy - b.oy || a.ox - b.ox || a.oz - b.oz);
-
-  // Calculate body size
-  let bodySize = varintBufSize(metadataJson.byteLength) + metadataJson.byteLength + varintBufSize(chunks.length);
-  for (const chunk of chunks) {
-    bodySize += signedVarintBufSize(chunk.ox) + signedVarintBufSize(chunk.oy) + signedVarintBufSize(chunk.oz);
-    bodySize += CHUNK_VOLUME;
-    if (rotationsEnabled) {
-      bodySize += varintBufSize(chunk.rots.size);
-      for (const [bi] of chunk.rots) { bodySize += varintBufSize(bi) + 1; }
-    }
-  }
-
-  const body = Buffer.allocUnsafe(bodySize);
-  let woff = 0;
-  woff = writeVarintToBuf(body, woff, metadataJson.byteLength);
-  metadataJson.copy(body, woff); woff += metadataJson.byteLength;
-  woff = writeVarintToBuf(body, woff, chunks.length);
-
-  for (const chunk of chunks) {
-    woff = writeSignedVarint(body, woff, chunk.ox);
-    woff = writeSignedVarint(body, woff, chunk.oy);
-    woff = writeSignedVarint(body, woff, chunk.oz);
-    body.set(chunk.blocks, woff); woff += CHUNK_VOLUME;
-    if (rotationsEnabled) {
-      const rotEntries = Array.from(chunk.rots.entries()).sort((a, b) => a[0] - b[0]);
-      woff = writeVarintToBuf(body, woff, rotEntries.length);
-      for (const [bi, ri] of rotEntries) {
-        woff = writeVarintToBuf(body, woff, bi);
-        body.writeUInt8(ri, woff++);
-      }
-    }
-  }
-
-  // Header: 8 magic + 1 version + 1 algo + 2 reserved = 12 bytes
-  const MAGIC = Buffer.from('HYTCHUNK');
-  const ALGO_MAP = { 'none': 0, 'brotli': 1, 'gzip': 2 };
-  const header = Buffer.allocUnsafe(12);
-  MAGIC.copy(header, 0);
-  header.writeUInt8(1, 8);
-  header.writeUInt8(ALGO_MAP[options.algorithm] || 1, 9);
-  header.writeUInt16LE(0, 10);
-
-  const cacheAlgo = options.algorithm || 'brotli';
-  const cacheLvl = options.level !== undefined ? options.level : 6;
-  const bodyCompressed = compressBuffer(cacheAlgo, body, cacheLvl);
-
-  return Buffer.concat([header, bodyCompressed]);
-}
-
-// -- Low-level encoding/decoding primitives --
-
-function encodeZigzag(value) { return (value << 1) ^ (value >> 31); }
-function decodeZigzag(value) { return (value >>> 1) ^ -(value & 1); }
-
-function writeVarintToBuf(buffer, offset, value) {
-  let current = value >>> 0;
-  while (current > 0x7f) { buffer[offset++] = (current & 0x7f) | 0x80; current >>>= 7; }
-  buffer[offset++] = current;
-  return offset;
-}
-
-function writeSignedVarint(buffer, offset, signedValue) {
-  return writeVarintToBuf(buffer, offset, encodeZigzag(signedValue));
-}
-
-function readVarintFromBuf(buffer, offset) {
-  let value = 0, shift = 0, byte;
-  do { byte = buffer[offset++]; value |= (byte & 0x7f) << shift; shift += 7; } while (byte & 0x80);
-  return { value: value >>> 0, offset };
-}
-
-function varintBufSize(value) {
-  let current = value >>> 0, size = 1;
-  while (current > 0x7f) { size++; current >>>= 7; }
-  return size;
-}
-
-function signedVarintBufSize(signedValue) {
-  return varintBufSize(encodeZigzag(signedValue));
-}
-
-function compressBuffer(algorithm, input, level) {
-  if (algorithm === 'none') return input;
-  if (algorithm === 'gzip') return zlib.gzipSync(input, { level: Math.min(9, Math.max(0, level)) });
-  return zlib.brotliCompressSync(input, {
-    params: {
-      [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC,
-      [zlib.constants.BROTLI_PARAM_QUALITY]: Math.min(11, Math.max(0, level)),
-      [zlib.constants.BROTLI_PARAM_SIZE_HINT]: input.byteLength,
-    },
-  });
-}
-
-function decompressBuffer(algorithm, input) {
-  if (algorithm === 'none') return input;
-  if (algorithm === 'gzip') return zlib.gunzipSync(input);
-  return zlib.brotliDecompressSync(input);
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(2)} MB`;
 }
 
 // ================================================================================
