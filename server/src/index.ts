@@ -182,6 +182,28 @@ export { default as WebServer, WebServerEvent } from '@/networking/WebServer';
 export { default as World, WorldEvent } from '@/worlds/World';
 export type { WorldEventPayloads, WorldMap, WorldOptions } from '@/worlds/World';
 
+// WorldMapCodec
+export { default as WorldMapCodec } from '@/worlds/maps/WorldMapCodec';
+export type { CompressedWorldMap, CompressWorldMapOptions, CompressedWorldMapAlgorithm } from '@/worlds/maps/WorldMapCodec';
+
+// WorldMapChunkCacheCodec
+export { default as WorldMapChunkCacheCodec } from '@/worlds/maps/WorldMapChunkCacheCodec';
+export type {
+  WorldMapChunkCache,
+  WorldMapChunkCacheAlgorithm,
+  WorldMapChunkCacheMetadata,
+  WorldMapChunkCacheOptions,
+  CreateWorldMapChunkCacheOptions,
+} from '@/worlds/maps/WorldMapChunkCacheCodec';
+
+// WorldMapFileLoader
+export { default as WorldMapFileLoader } from '@/worlds/maps/WorldMapFileLoader';
+export type { AnyWorldMap } from '@/worlds/maps/WorldMapFileLoader';
+
+// WorldMapArtifactsGenerator
+export { default as WorldMapArtifactsGenerator } from '@/worlds/maps/WorldMapArtifacts';
+export type { WorldMapArtifacts } from '@/worlds/maps/WorldMapArtifacts';
+
 // WorldLoop
 export { default as WorldLoop, WorldLoopEvent } from '@/worlds/WorldLoop';
 export type { WorldLoopEventPayloads } from '@/worlds/WorldLoop';

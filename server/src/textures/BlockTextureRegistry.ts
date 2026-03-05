@@ -20,6 +20,7 @@ const BLOCK_TEXTURE_REGISTRY_CONFIG = {
   DATA_SCHEMA_VERSION: 1,
   DIRECTORIES: [
     AssetsLibrary.assetsLibraryPath && path.join(AssetsLibrary.assetsLibraryPath, 'blocks'),
+    path.resolve(process.cwd(), 'node_modules', '@hytopia.com', 'assets', 'blocks'),
     path.resolve(process.cwd(), 'assets', 'blocks'),
   ].filter(Boolean) as string[],
 } as const;

@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 
 import { execSync, spawn } from 'child_process';
+import crypto from 'crypto';
 import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import nodemon from 'nodemon';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
+
+// Lazy-loaded SDK module (loaded once on first use from ../server.mjs)
+let _sdk = null;
 
 // Store command-line flags
 const flags = {};
@@ -39,6 +43,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
     'help': displayHelp,
     'init': init,
     'init-mcp': initMcp,
+    'map-compress': mapCompress,
     'package': packageProject,
     'run': run,
     'start': start,
@@ -81,13 +86,19 @@ async function start() {
   const buildCmd = `hytopia build-dev ${inputFile}`;
   const runCmd = `"${process.execPath}" --enable-source-maps "${entryFile}"`;
 
+  // Auto-recompress map if stale before first build
+  await autoRecompressMap();
+
   // Start nodemon to watch for changes, rebuild, then run the server
   nodemon({
     watch: ['.'],
-    ext: 'js,ts,html',
-    ignore: ['node_modules/**', '.git/**', '*.zip', outputFile, 'assets/**'],
+    ext: 'js,ts,html,json,bin',
+    ignore: ['node_modules/**', '.git/**', '*.zip', outputFile, 'assets/map.compressed.json', 'assets/map.chunks.bin'],
     exec: `${buildCmd} && ${runCmd}`,
     delay: 100,
+  })
+  .on('restart', () => {
+    autoRecompressMap().catch(() => {});
   })
   .on('quit', () => {
     console.log('👋 Shutting down...');
@@ -494,6 +505,165 @@ async function packageProject() {
   archive.finalize();
 }
 
+async function getSDK() {
+  if (!_sdk) {
+    const sdkPath = path.resolve(__dirname, '..', 'server.mjs');
+    _sdk = await import(sdkPath);
+  }
+  return _sdk;
+}
+
+function getSDKSync() {
+  if (!_sdk) throw new Error('SDK not loaded — call await getSDK() first');
+  return _sdk;
+}
+
+function generateArtifacts(worldMap, options = {}) {
+  const sdk = getSDKSync();
+  return sdk.WorldMapArtifactsGenerator.create(worldMap, {
+    compressed: { algorithm: options.algorithm || 'brotli', level: options.level ?? 9 },
+    chunkCache: { algorithm: options.algorithm || 'brotli', level: options.cacheLevel ?? 6 },
+  });
+}
+
+function isCompressedMap(parsed) {
+  return parsed && typeof parsed === 'object' &&
+    typeof parsed.data === 'string' && parsed.bounds &&
+    typeof parsed.bounds.minX === 'number';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
+/**
+ * Auto-recompress map if compressed artifacts are stale.
+ * Called by `hytopia start` before each build cycle.
+ * Only acts if compressed artifacts already exist (i.e. user has run map-compress before).
+ */
+async function autoRecompressMap() {
+  const mapPath = path.resolve(process.cwd(), 'assets/map.json');
+  const compressedPath = path.resolve(process.cwd(), 'assets/map.compressed.json');
+  const chunkCachePath = path.resolve(process.cwd(), 'assets/map.chunks.bin');
+
+  if (!fs.existsSync(mapPath)) return;
+  if (!fs.existsSync(compressedPath) && !fs.existsSync(chunkCachePath)) return;
+
+  const mapMtime = fs.statSync(mapPath).mtimeMs;
+  const compressedMtime = fs.existsSync(compressedPath) ? fs.statSync(compressedPath).mtimeMs : 0;
+  if (compressedMtime >= mapMtime) return;
+
+  console.log('📦 map.json changed — recompressing...');
+
+  try {
+    await getSDK();
+    const rawText = fs.readFileSync(mapPath, 'utf-8');
+    const parsed = JSON.parse(rawText);
+    if (isCompressedMap(parsed)) return;
+
+    const inputSize = Buffer.byteLength(rawText);
+    const artifacts = generateArtifacts(parsed);
+
+    fs.writeFileSync(compressedPath, artifacts.compressedMapJson);
+    fs.writeFileSync(chunkCachePath, artifacts.chunkCacheBuffer);
+
+    const compressedSize = Buffer.byteLength(artifacts.compressedMapJson);
+    const ratio = ((1 - (compressedSize / inputSize)) * 100).toFixed(1);
+    console.log(`   ✅ Recompressed: ${formatSize(compressedSize)} (${ratio}% smaller) + ${formatSize(artifacts.chunkCacheBuffer.byteLength)} chunk cache`);
+  } catch (err) {
+    console.error(`   ⚠️ Auto-recompress failed: ${err.message}`);
+  }
+}
+
+/**
+ * Map compress command
+ *
+ * Compresses a WorldMap JSON into optimized formats for faster loading
+ * and smaller file sizes.
+ *
+ * @example
+ * `hytopia map-compress`
+ * `hytopia map-compress assets/map.json`
+ * `hytopia map-compress assets/map.json --algorithm brotli --level 9`
+ * `hytopia map-compress assets/map.json --no-chunk-cache`
+ */
+async function mapCompress() {
+  const mapPath = process.argv[3] || 'assets/map.json';
+  const absoluteMapPath = path.resolve(process.cwd(), mapPath);
+
+  if (!fs.existsSync(absoluteMapPath)) {
+    console.error(`❌ Map file not found: ${absoluteMapPath}`);
+    process.exit(1);
+  }
+
+  const algorithm = flags['algorithm'] || 'brotli';
+  const level = flags['level'] !== undefined ? Number(flags['level']) : 9;
+  const cacheLevel = flags['cache-level'] !== undefined ? Number(flags['cache-level']) : 6;
+  const noChunkCache = process.argv.includes('--no-chunk-cache');
+
+  if (!['brotli', 'gzip', 'none'].includes(algorithm)) {
+    console.error(`❌ Invalid algorithm: ${algorithm}. Must be brotli, gzip, or none.`);
+    process.exit(1);
+  }
+
+  const basePath = absoluteMapPath.endsWith('.json')
+    ? absoluteMapPath.slice(0, -'.json'.length)
+    : absoluteMapPath;
+  const compressedOutPath = basePath + '.compressed.json';
+  const chunkCacheOutPath = basePath + '.chunks.bin';
+
+  console.log(`📦 Compressing map: ${mapPath}`);
+
+  const rawText = fs.readFileSync(absoluteMapPath, 'utf-8');
+  const inputSize = Buffer.byteLength(rawText);
+  const parsed = JSON.parse(rawText);
+
+  if (isCompressedMap(parsed)) {
+    console.error('❌ Input file is already a compressed map. Provide the original map.json.');
+    process.exit(1);
+  }
+
+  const blocks = parsed.blocks || {};
+  const blockCount = Object.keys(blocks).length;
+  console.log(`   Input: ${formatSize(inputSize)} (${blockCount.toLocaleString()} blocks)`);
+
+  await getSDK();
+  const sdk = getSDKSync();
+
+  const compressStart = performance.now();
+  const compressedMap = sdk.WorldMapCodec.compress(parsed, { algorithm, level });
+  const compressMs = performance.now() - compressStart;
+  const compressedJson = JSON.stringify(compressedMap);
+  const compressedSize = Buffer.byteLength(compressedJson);
+
+  fs.writeFileSync(compressedOutPath, compressedJson);
+  const ratio = ((1 - (compressedSize / inputSize)) * 100).toFixed(1);
+  console.log(`   Compressed: ${formatSize(compressedSize)} (${ratio}% smaller) [${compressMs.toFixed(0)}ms]`);
+  console.log(`   ✅ ${path.relative(process.cwd(), compressedOutPath)}`);
+
+  if (!noChunkCache) {
+    const sha256 = crypto.createHash('sha256').update(compressedJson).digest('hex');
+
+    const cacheStart = performance.now();
+    const chunkCache = sdk.WorldMapChunkCacheCodec.create(compressedMap, {
+      algorithm, level: cacheLevel, sourceSha256: sha256,
+    });
+    const cacheMs = performance.now() - cacheStart;
+    const chunkCacheBuffer = Buffer.from(chunkCache.data, 'base64');
+
+    fs.writeFileSync(chunkCacheOutPath, chunkCacheBuffer);
+    console.log(`   Chunk cache: ${formatSize(chunkCacheBuffer.byteLength)} [${cacheMs.toFixed(0)}ms]`);
+    console.log(`   ✅ ${path.relative(process.cwd(), chunkCacheOutPath)}`);
+  }
+
+  logDivider();
+  console.log('Done! Your game will automatically use these files when the');
+  console.log('SDK detects them alongside your map.json.');
+}
+
 // ================================================================================
 // UTILITY FUNCTIONS
 // ================================================================================
@@ -649,6 +819,7 @@ function displayHelp() {
   console.log('  run [FILE]                  Run the project once without watching (default: index.ts)');
   console.log('  init [--template NAME]      Initialize a new project');
   console.log('  init-mcp                    Setup MCP integrations');
+  console.log('  map-compress [FILE]         Compress a map for faster loading (default: assets/map.json)');
   console.log('  package                     Create a zip of the project for uploading to the HYTOPIA create portal.');
   console.log('  upgrade-assets-library [VERSION]    Upgrade the @hytopia.com/assets package (default: latest)');
   console.log('  upgrade-cli [VERSION]       Upgrade the HYTOPIA CLI (default: latest)');
@@ -657,5 +828,7 @@ function displayHelp() {
   console.log('Examples:');
   console.log('  hytopia init --template zombies-fps');
   console.log('  hytopia start playground.ts');
+  console.log('  hytopia map-compress');
+  console.log('  hytopia map-compress assets/map.json --algorithm gzip');
   console.log('  hytopia upgrade-project 0.8.12');
 }

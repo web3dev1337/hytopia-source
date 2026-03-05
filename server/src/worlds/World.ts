@@ -12,11 +12,18 @@ import SceneUIManager from '@/worlds/ui/SceneUIManager';
 import Serializer from '@/networking/Serializer';
 import Simulation from '@/worlds/physics/Simulation';
 import WorldLoop from '@/worlds/WorldLoop';
+import fs from 'fs';
+import path from 'path';
+import WorldMapCodec from '@/worlds/maps/WorldMapCodec';
+import WorldMapChunkCacheCodec from '@/worlds/maps/WorldMapChunkCacheCodec';
+import WorldMapFileLoader from '@/worlds/maps/WorldMapFileLoader';
 import { BLOCK_ROTATIONS } from '@/worlds/blocks/Block';
 import type { BlockTypeOptions } from '@/worlds/blocks/BlockType';
 import type { EntityOptions } from '@/worlds/entities/Entity';
 import type RgbColor from '@/shared/types/RgbColor';
 import type Vector3Like from '@/shared/types/math/Vector3Like';
+import type { CompressedWorldMap } from '@/worlds/maps/WorldMapCodec';
+import type { WorldMapChunkCache } from '@/worlds/maps/WorldMapChunkCacheCodec';
 
 /**
  * A map representation for initializing a world.
@@ -95,7 +102,7 @@ export interface WorldOptions {
   fogNear?: number;
 
   /** The map of the world. */
-  map?: WorldMap;
+  map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
 
   /** The name of the world. */
   name: string;
@@ -500,22 +507,43 @@ export default class World extends EventRouter implements protocol.Serializable 
    * - Registers block types from the map into `World.blockTypeRegistry`.
    * - Spawns map entities as `isEnvironmental: true` by default.
    *
-   * @param map - The map to load.
+   * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+   *   WorldMapChunkCache) or a string file path. When a string is provided,
+   *   WorldMapFileLoader auto-detects the best available format
+   *   (.chunks.bin \> .compressed.json \> .json).
    *
    * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
    *
    * **Category:** Core
    */
-  public loadMap(map: WorldMap) {
-    // Clear any prior map
-    this.chunkLattice.clear();
+  public loadMap(
+    map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string,
+    options: { spawnEntities?: boolean, preferMapArtifacts?: boolean } = {},
+  ) {
+    if (typeof map === 'string') {
+      map = WorldMapFileLoader.load(map);
+    }
 
-    // Rotations LUT
-    const BLOCK_ROTATIONS_BY_INDEX = Object.values(BLOCK_ROTATIONS).sort((a, b) => a.enumIndex - b.enumIndex);
+    // Auto-upgrade: if a legacy WorldMap was passed but compressed artifacts
+    // exist at the conventional assets/ location, prefer those for faster loading.
+    const preferMapArtifacts = options.preferMapArtifacts ?? true;
+    if (preferMapArtifacts && !WorldMapCodec.isCompressedWorldMap(map) && !WorldMapChunkCacheCodec.isWorldMapChunkCache(map) && typeof map === 'object' && map !== null && 'blocks' in map) {
+      const basePath = path.resolve(process.cwd(), 'assets/map');
+      const chunkCachePath = basePath + '.chunks.bin';
+      const compressedPath = basePath + '.compressed.json';
+      const jsonPath = basePath + '.json';
 
-    // load map block types
-    if (map.blockTypes) {
-      for (const blockTypeData of map.blockTypes) {
+      if (fs.existsSync(jsonPath) && (fs.existsSync(chunkCachePath) || fs.existsSync(compressedPath))) {
+        map = WorldMapFileLoader.load('assets/map.json');
+      }
+    }
+
+    const spawnEntities = options.spawnEntities ?? true;
+
+    const registerMapBlockTypes = (blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>) => {
+      if (!blockTypes) return;
+      const list = Array.isArray(blockTypes) ? blockTypes : Object.values(blockTypes);
+      for (const blockTypeData of list) {
         this.blockTypeRegistry.registerGenericBlockType({
           id: blockTypeData.id,
           isLiquid: blockTypeData.isLiquid,
@@ -525,38 +553,12 @@ export default class World extends EventRouter implements protocol.Serializable 
           customColliderOptions: blockTypeData.customColliderOptions,
         });
       }
-    }
+    };
 
-    // load map chunk blocks
-    if (map.blocks) {
-      const mapBlocks = map.blocks;
-      const blockEntries = function* () {
-        for (const key in mapBlocks) {
-          const blockValue = mapBlocks[key];
-          const blockTypeId = typeof blockValue === 'number' ? blockValue : blockValue.i;
-          const blockRotationIndex = typeof blockValue === 'number' ? undefined : blockValue.r;
-          const i1 = key.indexOf(',');
-          const i2 = key.indexOf(',', i1 + 1);
-
-          yield {
-            globalCoordinate: {
-              x: Number(key.slice(0, i1)),
-              y: Number(key.slice(i1 + 1, i2)),
-              z: Number(key.slice(i2 + 1)),
-            },
-            blockTypeId,
-            blockRotation: blockRotationIndex !== undefined ? BLOCK_ROTATIONS_BY_INDEX[blockRotationIndex] : undefined,
-          };
-        }
-      };
-
-      this.chunkLattice.initializeBlockEntries(blockEntries());
-    }
-
-    // load map entities
-    if (map.entities) {
-      for (const key in map.entities) {
-        const entityOptions = map.entities[key];
+    const spawnMapEntities = (entities?: WorldMap['entities']) => {
+      if (!spawnEntities || !entities) return;
+      for (const key in entities) {
+        const entityOptions = entities[key];
         const i1 = key.indexOf(',');
         const i2 = key.indexOf(',', i1 + 1);
         const x = Number(key.slice(0, i1));
@@ -570,7 +572,64 @@ export default class World extends EventRouter implements protocol.Serializable 
 
         entity.spawn(this, { x, y, z });
       }
+    };
+
+    if (WorldMapCodec.isCompressedWorldMap(map)) {
+      registerMapBlockTypes(map.blockTypes);
+
+      this.chunkLattice.initializeBlockEntries(WorldMapCodec.decodeBlockEntries(map));
+
+      spawnMapEntities(map.entities);
+
+      return;
     }
+
+    if (WorldMapChunkCacheCodec.isWorldMapChunkCache(map)) {
+      const { metadata, chunks } = WorldMapChunkCacheCodec.decode(map);
+
+      registerMapBlockTypes(map.blockTypes ?? metadata.blockTypes);
+
+      this.chunkLattice.initializeChunkCacheChunks(chunks);
+
+      spawnMapEntities(map.entities ?? metadata.entities);
+
+      return;
+    }
+
+    // Rotations LUT
+    const BLOCK_ROTATIONS_BY_INDEX = Object.values(BLOCK_ROTATIONS).sort((a, b) => a.enumIndex - b.enumIndex);
+
+    // load map block types
+    if (map.blockTypes) {
+      registerMapBlockTypes(map.blockTypes);
+    }
+
+    // load map chunk blocks
+    const mapBlocks = map.blocks ?? {};
+    const blockEntries = function* () {
+      for (const key in mapBlocks) {
+        const blockValue = mapBlocks[key];
+        const blockTypeId = typeof blockValue === 'number' ? blockValue : blockValue.i;
+        const blockRotationIndex = typeof blockValue === 'number' ? undefined : blockValue.r;
+        const i1 = key.indexOf(',');
+        const i2 = key.indexOf(',', i1 + 1);
+
+        yield {
+          globalCoordinate: {
+            x: Number(key.slice(0, i1)),
+            y: Number(key.slice(i1 + 1, i2)),
+            z: Number(key.slice(i2 + 1)),
+          },
+          blockTypeId,
+          blockRotation: blockRotationIndex !== undefined ? BLOCK_ROTATIONS_BY_INDEX[blockRotationIndex] : undefined,
+        };
+      }
+    };
+
+    this.chunkLattice.initializeBlockEntries(blockEntries());
+
+    // load map entities
+    spawnMapEntities(map.entities);
   }
 
   /**

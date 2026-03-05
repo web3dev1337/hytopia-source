@@ -12,6 +12,8 @@ import type { Socket } from 'net';
 import { WebSocket as WebSocket_2 } from 'ws';
 import type { WebTransportSessionImpl } from '@fails-components/webtransport/dist/lib/types';
 
+export declare type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
+
 /**
  * Manages the assets library and synchronization of assets
  * to the local assets directory in development.
@@ -1749,6 +1751,13 @@ export declare class Chunk implements protocol.Serializable {
 
 
 
+
+}
+
+declare interface ChunkCacheChunk {
+    originCoordinate: Vector3Like;
+    blocks: Uint8Array;
+    blockRotations: Map<number, BlockRotation>;
 }
 
 /**
@@ -1904,6 +1913,7 @@ export declare class ChunkLattice extends EventRouter {
     initializeBlocks(blocks: {
         [blockTypeId: number]: BlockPlacement[];
     }): void;
+
 
     /**
      * Sets the block at a global coordinate by block type ID.
@@ -2589,6 +2599,43 @@ export declare class CollisionGroupsBuilder {
  */
 export declare type CommandCallback = (player: Player, args: string[], message: string) => void;
 
+export declare interface CompressedWorldMap {
+    format?: 'hytopia.worldmap.compressed';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: CompressedWorldMapAlgorithm;
+    data: string;
+    bounds: CompressedWorldMapBounds;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+    options?: CompressedWorldMapOptions;
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare type CompressedWorldMapAlgorithm = 'brotli' | 'gzip' | 'none';
+
+declare interface CompressedWorldMapBounds {
+    minX: number;
+    minY: number;
+    minZ: number;
+    maxX: number;
+    maxY: number;
+    maxZ: number;
+}
+
+declare interface CompressedWorldMapOptions {
+    rotations?: boolean;
+    useDelta?: boolean;
+    useVarint?: boolean;
+}
+
+export declare interface CompressWorldMapOptions {
+    algorithm?: CompressedWorldMapAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+}
+
 /**
  * The options for a cone collider. @public
  *
@@ -2646,6 +2693,13 @@ export declare type ContactManifold = {
     /** The normal vector of the contact. */
     normal: Vector3Like;
 };
+
+export declare interface CreateWorldMapChunkCacheOptions {
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+    sourceSha256?: string;
+}
 
 /**
  * The options for a cylinder collider. @public
@@ -6096,6 +6150,7 @@ export declare class ModelRegistry {
      * **Category:** Models
      */
     modelHasNode(modelUri: string, nodeName: string): boolean;
+
 
 
 
@@ -11343,13 +11398,19 @@ export declare class World extends EventRouter implements protocol.Serializable 
      * - Registers block types from the map into `World.blockTypeRegistry`.
      * - Spawns map entities as `isEnvironmental: true` by default.
      *
-     * @param map - The map to load.
+     * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+     *   WorldMapChunkCache) or a string file path. When a string is provided,
+     *   WorldMapFileLoader auto-detects the best available format
+     *   (.chunks.bin \> .compressed.json \> .json).
      *
      * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
      *
      * **Category:** Core
      */
-    loadMap(map: WorldMap): void;
+    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
+        spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
+    }): void;
     /**
      * Sets the color of the world's ambient light.
      *
@@ -11852,6 +11913,83 @@ export declare interface WorldMap {
     };
 }
 
+export declare type WorldMapArtifacts = {
+    compressedMap: CompressedWorldMap;
+    compressedMapJson: string;
+    compressedMapSha256: string;
+    chunkCache: WorldMapChunkCache;
+    chunkCacheBuffer: Buffer;
+};
+
+export declare class WorldMapArtifactsGenerator {
+    static create(worldMap: WorldMap, options?: {
+        compressed?: CompressWorldMapOptions;
+        chunkCache?: Omit<CreateWorldMapChunkCacheOptions, 'sourceSha256'>;
+    }): WorldMapArtifacts;
+}
+
+export declare interface WorldMapChunkCache {
+    format?: 'hytopia.worldmap.chunk-cache';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    data: string;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+}
+
+export declare type WorldMapChunkCacheAlgorithm = 'brotli' | 'gzip' | 'none';
+
+export declare class WorldMapChunkCacheCodec {
+    private static _writeHeader;
+    static isWorldMapChunkCache(value: unknown): value is WorldMapChunkCache;
+    static create(map: WorldMap | CompressedWorldMap, options?: CreateWorldMapChunkCacheOptions): WorldMapChunkCache;
+    static decode(cache: WorldMapChunkCache): {
+        metadata: WorldMapChunkCacheMetadata;
+        chunks: Iterable<ChunkCacheChunk>;
+    };
+    static decodeMetadata(cache: WorldMapChunkCache): WorldMapChunkCacheMetadata;
+    static decodeChunks(cache: WorldMapChunkCache): Iterable<ChunkCacheChunk>;
+    static decompressToWorldMap(cache: WorldMapChunkCache): WorldMap;
+    private static _decodeFile;
+    private static _decodeMetadata;
+    private static _decodeChunks;
+    private static _encodeBody;
+}
+
+export declare interface WorldMapChunkCacheMetadata {
+    blockTypes?: BlockTypeOptions[];
+    entities?: WorldMap['entities'];
+    options?: WorldMapChunkCacheOptions;
+    source?: {
+        sha256?: string;
+    };
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare interface WorldMapChunkCacheOptions {
+    rotations?: boolean;
+}
+
+export declare class WorldMapCodec {
+    static isCompressedWorldMap(value: unknown): value is CompressedWorldMap;
+    static compress(map: WorldMap, options?: CompressWorldMapOptions): CompressedWorldMap;
+    static decodeBlockEntries(map: CompressedWorldMap): Iterable<{
+        globalCoordinate: Vector3Like;
+        blockTypeId: number;
+        blockRotation?: BlockRotation;
+    }>;
+    static decompressToWorldMap(map: CompressedWorldMap): WorldMap;
+}
+
+export declare class WorldMapFileLoader {
+    static load(mapPath: string, options?: {
+        preferChunkCache?: boolean;
+        warnings?: 'auto' | 'always' | 'never';
+    }): AnyWorldMap;
+}
+
 /**
  * Options for creating a World instance.
  *
@@ -11885,7 +12023,7 @@ export declare interface WorldOptions {
     /** The minimum distance from the camera to start applying fog. */
     fogNear?: number;
     /** The map of the world. */
-    map?: WorldMap;
+    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
     /** The name of the world. */
     name: string;
     /** The intensity of the skybox brightness for the world. 0 is black, 1 is full brightness, 1+ is brighter. */

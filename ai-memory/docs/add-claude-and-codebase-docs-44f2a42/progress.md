@@ -1,6 +1,0 @@
-- [x] Scan codebase
-- [x] Read entry points and key files
-- [x] Write CODEBASE_DOCUMENTATION.md
-- [x] Write CLAUDE.md
-- [x] Verify all file paths
-- [x] Commit and push
