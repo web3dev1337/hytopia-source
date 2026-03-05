@@ -36,6 +36,7 @@ export default class BotPlayer {
     this._behavior = options?.behavior ?? null;
 
     const controller = new SimpleEntityController();
+    const rigidBodyType = options?.rigidBodyType ?? RigidBodyType.KINEMATIC_POSITION;
 
     this.entity = new Entity({
       name: this.name,
@@ -43,8 +44,10 @@ export default class BotPlayer {
       modelScale: options?.modelScale ?? 1,
       controller,
       rigidBodyOptions: {
-        type: options?.rigidBodyType ?? RigidBodyType.KINEMATIC_POSITION,
-        enabledRotations: { x: false, y: true, z: false },
+        type: rigidBodyType,
+        ...(rigidBodyType === RigidBodyType.DYNAMIC
+          ? { enabledRotations: { x: false, y: true, z: false } }
+          : {}),
       },
     });
 
