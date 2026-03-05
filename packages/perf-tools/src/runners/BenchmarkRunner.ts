@@ -128,12 +128,66 @@ export default class BenchmarkRunner {
             await this._serverApi.action({
               type: 'load_map',
               mapPath: action.mapPath ?? '',
+              worldId: typeof action.worldId === 'number' ? action.worldId : undefined,
             });
             break;
           case 'spawn_entities':
+            await this._serverApi.action({
+              type: 'spawn_entities',
+              count: action.count ?? 0,
+              kind: action.kind,
+              options: action.options,
+              tag: action.tag,
+            });
+            break;
+          case 'despawn_entities':
+            await this._serverApi.action({
+              type: 'despawn_entities',
+              tag: action.tag,
+            });
+            break;
+          case 'start_block_churn':
+            await this._serverApi.action({
+              type: 'start_block_churn',
+              blocksPerTick: action.blocksPerTick ?? 0,
+              blockTypeId: action.blockTypeId ?? 0,
+              mode: action.mode,
+              min: action.min,
+              max: action.max,
+            });
+            break;
+          case 'stop_block_churn':
+            await this._serverApi.action({
+              type: 'stop_block_churn',
+            });
+            break;
+          case 'create_worlds':
+            await this._serverApi.action({
+              type: 'create_worlds',
+              count: action.count ?? 0,
+              mapPath: action.mapPath,
+              setDefault: action.setDefault,
+            });
+            break;
+          case 'set_default_world':
+            await this._serverApi.action({
+              type: 'set_default_world',
+              worldId: action.worldId ?? 0,
+            });
+            break;
+          case 'clear_world':
+            await this._serverApi.action({
+              type: 'clear_world',
+            });
+            break;
+          case 'connect_clients':
+            await this._launchWsClients(action.count ?? 0, action.staggerMs);
+            break;
+          case 'disconnect_clients':
+            await this._disconnectWsClients(action.count);
+            break;
           case 'custom':
             throw new Error(`Action not supported yet: ${action.type}`);
-            break;
         }
       }
     }
@@ -198,15 +252,60 @@ export default class BenchmarkRunner {
     });
   }
 
-  private async _launchWsClients(count: number): Promise<void> {
+  private async _launchWsClients(count: number, staggerMs?: number): Promise<void> {
     const wsUrl = toWebSocketUrl(this._options.clientUrl);
 
     this._log(`[bench] Launching ${count} WebSocket client(s): ${wsUrl}`);
 
-    for (let i = 0; i < count; i++) {
-      const client = new WsClient({ url: wsUrl });
-      await client.connect();
-      this._wsClients.push(client);
+    const delayMs = typeof staggerMs === 'number' ? Math.max(0, Math.floor(staggerMs)) : 0;
+
+    if (delayMs > 0) {
+      for (let i = 0; i < count; i++) {
+        const client = new WsClient({ url: wsUrl });
+        await client.connect();
+        this._wsClients.push(client);
+
+        if (i < count - 1) {
+          // eslint-disable-next-line no-await-in-loop
+          await this._wait(delayMs);
+        }
+      }
+
+      return;
+    }
+
+    const batchSize = 25;
+
+    for (let offset = 0; offset < count; offset += batchSize) {
+      const batchCount = Math.min(batchSize, count - offset);
+      const batchClients: WsClient[] = [];
+
+      for (let i = 0; i < batchCount; i++) {
+        batchClients.push(new WsClient({ url: wsUrl }));
+      }
+
+      await Promise.all(batchClients.map(async client => {
+        await client.connect();
+        this._wsClients.push(client);
+      }));
+    }
+  }
+
+  private async _disconnectWsClients(count?: number): Promise<void> {
+    if (count === undefined) {
+      for (const client of this._wsClients) {
+        await client.close();
+      }
+
+      this._wsClients = [];
+      return;
+    }
+
+    const target = Math.max(0, Math.floor(count));
+
+    for (let i = 0; i < target && this._wsClients.length > 0; i++) {
+      const client = this._wsClients.pop()!;
+      await client.close();
     }
   }
 
@@ -276,6 +375,25 @@ export default class BenchmarkRunner {
       ? clientSnapshots.reduce((s, v) => s + v.fps, 0) / clientSnapshots.length
       : undefined;
 
+    const networkSnapshots = snapshots.flatMap(s => (s.network ? [ s.network ] : []));
+    const network = networkSnapshots.length > 0
+      ? {
+          totalBytesSent: Math.max(...networkSnapshots.map(s => s.bytesSentTotal)),
+          totalBytesReceived: Math.max(...networkSnapshots.map(s => s.bytesReceivedTotal)),
+          maxConnectedPlayers: Math.max(...networkSnapshots.map(s => s.connectedPlayers)),
+          avgBytesSentPerSecond: average(networkSnapshots, s => s.bytesSentPerSecond),
+          maxBytesSentPerSecond: max(networkSnapshots, s => s.bytesSentPerSecond),
+          avgBytesReceivedPerSecond: average(networkSnapshots, s => s.bytesReceivedPerSecond),
+          maxBytesReceivedPerSecond: max(networkSnapshots, s => s.bytesReceivedPerSecond),
+          avgPacketsSentPerSecond: average(networkSnapshots, s => s.packetsSentPerSecond),
+          maxPacketsSentPerSecond: max(networkSnapshots, s => s.packetsSentPerSecond),
+          avgPacketsReceivedPerSecond: average(networkSnapshots, s => s.packetsReceivedPerSecond),
+          maxPacketsReceivedPerSecond: max(networkSnapshots, s => s.packetsReceivedPerSecond),
+          avgSerializationMs: average(networkSnapshots, s => s.avgSerializationMs),
+          compressionCountTotal: Math.max(...networkSnapshots.map(s => s.compressionCount)),
+        }
+      : undefined;
+
     return {
       avgTickMs,
       maxTickMs,
@@ -285,12 +403,25 @@ export default class BenchmarkRunner {
       avgMemoryMb,
       avgFps,
       operations,
+      network,
     };
   }
 
   private _wait(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+}
+
+function average<T>(items: T[], get: (item: T) => number): number {
+  if (items.length === 0) return 0;
+
+  return items.reduce((s, v) => s + get(v), 0) / items.length;
+}
+
+function max<T>(items: T[], get: (item: T) => number): number {
+  if (items.length === 0) return 0;
+
+  return Math.max(...items.map(get));
 }
 
 function resolveDefaultServerCwd(startDir: string): string {

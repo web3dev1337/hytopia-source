@@ -9,6 +9,21 @@ export interface BaselineResult {
   avgMemoryMb: number;
   avgFps?: number;
   operations: Record<string, { avgMs: number; p95Ms: number }>;
+  network?: {
+    totalBytesSent: number;
+    totalBytesReceived: number;
+    maxConnectedPlayers: number;
+    avgBytesSentPerSecond: number;
+    maxBytesSentPerSecond: number;
+    avgBytesReceivedPerSecond: number;
+    maxBytesReceivedPerSecond: number;
+    avgPacketsSentPerSecond: number;
+    maxPacketsSentPerSecond: number;
+    avgPacketsReceivedPerSecond: number;
+    maxPacketsReceivedPerSecond: number;
+    avgSerializationMs: number;
+    compressionCountTotal: number;
+  };
 }
 
 export interface ComparisonEntry {
@@ -53,6 +68,12 @@ export default class BaselineComparer {
 
     if (baseline.avgFps !== undefined && current.avgFps !== undefined) {
       entries.push(this._compareMetric('avgFps', baseline.avgFps, current.avgFps, true));
+    }
+
+    if (baseline.network && current.network) {
+      entries.push(this._compareMetric('net.maxBytesSentPerSecond', baseline.network.maxBytesSentPerSecond, current.network.maxBytesSentPerSecond));
+      entries.push(this._compareMetric('net.avgBytesSentPerSecond', baseline.network.avgBytesSentPerSecond, current.network.avgBytesSentPerSecond));
+      entries.push(this._compareMetric('net.avgSerializationMs', baseline.network.avgSerializationMs, current.network.avgSerializationMs));
     }
 
     const allBaselineOps = new Set([...Object.keys(baseline.operations), ...Object.keys(current.operations)]);

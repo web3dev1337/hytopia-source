@@ -1,0 +1,30 @@
+name: "entity-density"
+description: "500 dynamic block entities (colliders) to stress physics broadphase + entity update scanning"
+warmupMs: 5000
+phases:
+  - name: setup
+    actions:
+      - type: clear_world
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
+      - type: spawn_entities
+        count: 500
+        kind: block
+        tag: "perf-tools.entities"
+        options:
+          blockTextureUri: "blocks/bricks.png"
+          blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 }
+          rigidBodyOptions:
+            type: dynamic
+  - name: stabilize
+    duration: 10s
+  - name: measure
+    collect: true
+    duration: 60s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  memory_mb:
+    max: 2000
+

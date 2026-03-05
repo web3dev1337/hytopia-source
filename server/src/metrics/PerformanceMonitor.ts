@@ -25,6 +25,7 @@ export interface OperationStats {
 }
 
 export interface TickReport {
+  worldId: number;
   tick: number;
   durationMs: number;
   budgetMs: number;
@@ -67,6 +68,21 @@ interface OperationAccumulator {
   sampleCount: number;
 }
 
+interface WorldTickState {
+  tickDurations: Float64Array;
+  tickIndex: number;
+  tickCount: number;
+  ticksOverBudget: number;
+  maxTickMs: number;
+  totalTicks: number;
+
+  currentTick: number;
+  currentTickStart: number;
+  currentPhases: Record<string, number>;
+  currentEntityCount: number;
+  currentPlayerCount: number;
+}
+
 export default class PerformanceMonitor extends EventRouter {
   private static _instance: PerformanceMonitor;
 
@@ -83,22 +99,12 @@ export default class PerformanceMonitor extends EventRouter {
   private _spikeThresholdMs: number = 50;
   private _tickBudgetMs: number = 16.67;
   private _snapshotIntervalMs: number = 5000;
+  private _historySize: number = 3600;
   private _startTime: number = 0;
 
   private _operations: Map<string, OperationAccumulator> = new Map();
 
-  private _tickDurations: Float64Array;
-  private _tickIndex: number = 0;
-  private _tickCount: number = 0;
-  private _ticksOverBudget: number = 0;
-  private _maxTickMs: number = 0;
-  private _totalTicks: number = 0;
-
-  private _currentTick: number = 0;
-  private _currentTickStart: number = 0;
-  private _currentPhases: Record<string, number> = {};
-  private _currentEntityCount: number = 0;
-  private _currentPlayerCount: number = 0;
+  private _worldTicks: Map<number, WorldTickState> = new Map();
 
   private _entityCosts: Map<number, { tickMs: number; name: string }> = new Map();
 
@@ -106,7 +112,6 @@ export default class PerformanceMonitor extends EventRouter {
 
   private constructor() {
     super();
-    this._tickDurations = new Float64Array(3600);
   }
 
   public get isEnabled(): boolean {
@@ -126,14 +131,9 @@ export default class PerformanceMonitor extends EventRouter {
     this._tickBudgetMs = options?.tickBudgetMs ?? 16.67;
     this._snapshotIntervalMs = options?.snapshotIntervalMs ?? 5000;
 
-    const historySize = options?.historySize ?? 3600;
+    this._historySize = options?.historySize ?? 3600;
 
-    this._tickDurations = new Float64Array(historySize);
-    this._tickIndex = 0;
-    this._tickCount = 0;
-    this._ticksOverBudget = 0;
-    this._maxTickMs = 0;
-    this._totalTicks = 0;
+    this._worldTicks.clear();
     this._operations.clear();
     this._entityCosts.clear();
 
@@ -198,44 +198,59 @@ export default class PerformanceMonitor extends EventRouter {
     };
   }
 
-  public beginTick(tick: number, entityCount: number, playerCount: number): void {
-    this._currentTick = tick;
-    this._currentTickStart = performance.now();
-    this._currentPhases = {};
-    this._currentEntityCount = entityCount;
-    this._currentPlayerCount = playerCount;
+  public beginTick(tick: number, entityCount: number, playerCount: number, worldId: number = 0): void {
+    const state = this._getOrCreateWorldTickState(worldId);
+
+    state.currentTick = tick;
+    state.currentTickStart = performance.now();
+    state.currentPhases = {};
+    state.currentEntityCount = entityCount;
+    state.currentPlayerCount = playerCount;
   }
 
-  public recordPhase(phaseName: string, durationMs: number): void {
-    this._currentPhases[phaseName] = durationMs;
+  public recordPhase(phaseName: string, durationMs: number, worldId: number = 0): void {
+    const state = this._worldTicks.get(worldId);
+
+    if (!state) {
+      return;
+    }
+
+    state.currentPhases[phaseName] = durationMs;
   }
 
-  public endTick(): void {
-    const durationMs = performance.now() - this._currentTickStart;
+  public endTick(worldId: number = 0): void {
+    const state = this._worldTicks.get(worldId);
 
-    this._tickDurations[this._tickIndex] = durationMs;
-    this._tickIndex = (this._tickIndex + 1) % this._tickDurations.length;
-    this._tickCount = Math.min(this._tickCount + 1, this._tickDurations.length);
-    this._totalTicks++;
+    if (!state) {
+      return;
+    }
 
-    if (durationMs > this._maxTickMs) {
-      this._maxTickMs = durationMs;
+    const durationMs = performance.now() - state.currentTickStart;
+
+    state.tickDurations[state.tickIndex] = durationMs;
+    state.tickIndex = (state.tickIndex + 1) % state.tickDurations.length;
+    state.tickCount = Math.min(state.tickCount + 1, state.tickDurations.length);
+    state.totalTicks++;
+
+    if (durationMs > state.maxTickMs) {
+      state.maxTickMs = durationMs;
     }
 
     if (durationMs > this._tickBudgetMs) {
-      this._ticksOverBudget++;
+      state.ticksOverBudget++;
     }
 
     const heapUsedMb = process.memoryUsage().heapUsed / 1048576;
 
     const report: TickReport = {
-      tick: this._currentTick,
+      worldId,
+      tick: state.currentTick,
       durationMs,
       budgetMs: this._tickBudgetMs,
       budgetPercent: (durationMs / this._tickBudgetMs) * 100,
-      phases: { ...this._currentPhases },
-      entityCount: this._currentEntityCount,
-      playerCount: this._currentPlayerCount,
+      phases: { ...state.currentPhases },
+      entityCount: state.currentEntityCount,
+      playerCount: state.currentPlayerCount,
       heapUsedMb,
     };
 
@@ -254,20 +269,26 @@ export default class PerformanceMonitor extends EventRouter {
     return new Map(this._entityCosts);
   }
 
-  public getSnapshot(): PerformanceSnapshot {
+  public getSnapshot(worldId?: number): PerformanceSnapshot {
     const mem = process.memoryUsage();
-    const tickSamples = this._getTickSamples();
+    const tickSamples = typeof worldId === 'number'
+      ? this._getTickSamples(worldId)
+      : this._getAllTickSamples();
     const sorted = tickSamples.slice().sort((a, b) => a - b);
+
+    const rollup = typeof worldId === 'number'
+      ? this._getRollup(worldId)
+      : this._getGlobalRollup();
 
     return {
       uptimeMs: performance.now() - this._startTime,
       tickRate: 60,
       avgTickMs: sorted.length > 0 ? sorted.reduce((a, b) => a + b, 0) / sorted.length : 0,
-      maxTickMs: this._maxTickMs,
+      maxTickMs: rollup.maxTickMs,
       p95TickMs: sorted.length > 0 ? sorted[Math.floor(sorted.length * 0.95)] : 0,
       p99TickMs: sorted.length > 0 ? sorted[Math.floor(sorted.length * 0.99)] : 0,
-      ticksOverBudget: this._ticksOverBudget,
-      totalTicks: this._totalTicks,
+      ticksOverBudget: rollup.ticksOverBudget,
+      totalTicks: rollup.totalTicks,
       budgetMs: this._tickBudgetMs,
       operations: this._getOperationStats(),
       memory: {
@@ -279,11 +300,7 @@ export default class PerformanceMonitor extends EventRouter {
   }
 
   public resetStats(): void {
-    this._tickIndex = 0;
-    this._tickCount = 0;
-    this._ticksOverBudget = 0;
-    this._maxTickMs = 0;
-    this._totalTicks = 0;
+    this._worldTicks.clear();
     this._operations.clear();
     this._entityCosts.clear();
   }
@@ -317,16 +334,78 @@ export default class PerformanceMonitor extends EventRouter {
     acc.sampleCount = Math.min(acc.sampleCount + 1, acc.samples.length);
   }
 
-  private _getTickSamples(): number[] {
-    if (this._tickCount === 0) return [];
+  private _getOrCreateWorldTickState(worldId: number): WorldTickState {
+    const id = Math.floor(worldId);
+    let state = this._worldTicks.get(id);
+
+    if (!state) {
+      state = {
+        tickDurations: new Float64Array(this._historySize),
+        tickIndex: 0,
+        tickCount: 0,
+        ticksOverBudget: 0,
+        maxTickMs: 0,
+        totalTicks: 0,
+        currentTick: 0,
+        currentTickStart: 0,
+        currentPhases: {},
+        currentEntityCount: 0,
+        currentPlayerCount: 0,
+      };
+      this._worldTicks.set(id, state);
+    }
+
+    return state;
+  }
+
+  private _getTickSamples(worldId: number): number[] {
+    const state = this._worldTicks.get(Math.floor(worldId));
+
+    if (!state || state.tickCount === 0) return [];
 
     const result: number[] = [];
 
-    for (let i = 0; i < this._tickCount; i++) {
-      result.push(this._tickDurations[i]);
+    for (let i = 0; i < state.tickCount; i++) {
+      result.push(state.tickDurations[i]);
     }
 
     return result;
+  }
+
+  private _getAllTickSamples(): number[] {
+    const result: number[] = [];
+
+    for (const state of this._worldTicks.values()) {
+      for (let i = 0; i < state.tickCount; i++) {
+        result.push(state.tickDurations[i]);
+      }
+    }
+
+    return result;
+  }
+
+  private _getRollup(worldId: number): { maxTickMs: number; ticksOverBudget: number; totalTicks: number } {
+    const state = this._worldTicks.get(Math.floor(worldId));
+
+    return {
+      maxTickMs: state?.maxTickMs ?? 0,
+      ticksOverBudget: state?.ticksOverBudget ?? 0,
+      totalTicks: state?.totalTicks ?? 0,
+    };
+  }
+
+  private _getGlobalRollup(): { maxTickMs: number; ticksOverBudget: number; totalTicks: number } {
+    let maxTickMs = 0;
+    let ticksOverBudget = 0;
+    let totalTicks = 0;
+
+    for (const state of this._worldTicks.values()) {
+      maxTickMs = Math.max(maxTickMs, state.maxTickMs);
+      ticksOverBudget += state.ticksOverBudget;
+      totalTicks += state.totalTicks;
+    }
+
+    return { maxTickMs, ticksOverBudget, totalTicks };
   }
 
   private _getOperationStats(): Record<string, OperationStats> {

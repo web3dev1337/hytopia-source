@@ -150,6 +150,7 @@ metrics/Telemetry.ts - Span-based performance profiling
 models/ModelRegistry.ts - GLTF model preloading + bounding box extraction
 persistence/PersistenceManager.ts - Player/global KV storage via @hytopia.com/save-states
 perf/PerfHarness.ts - Env-gated /__perf endpoints for perf-tools
+perf/PerfBlockChurner.ts - Tick-driven block churn stressor (perf-tools)
 perf/perf-harness.ts - Benchmark server entry (build:perf-harness → src/perf-harness.mjs)
 server/src/assets/AssetsLibrary.ts - Asset path resolution
 ```

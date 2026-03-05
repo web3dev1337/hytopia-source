@@ -162,6 +162,7 @@ export default class WorldLoop extends EventRouter {
         this._currentTick,
         this._world.entityManager.entityCount,
         PlayerManager.instance.playerCount,
+        this._world.id,
       );
     }
 
@@ -184,31 +185,31 @@ export default class WorldLoop extends EventRouter {
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.ENTITIES_TICK,
       }, () => this._world.entityManager.tickEntities(tickDeltaMs));
-      if (profiling) perfMon.recordPhase('entities_tick', performance.now() - phaseStart);
+      if (profiling) perfMon.recordPhase('entities_tick', performance.now() - phaseStart, this._world.id);
 
       phaseStart = profiling ? performance.now() : 0;
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.SIMULATION_STEP,
       }, () => this._world.simulation.step(tickDeltaMs));
-      if (profiling) perfMon.recordPhase('simulation_step', performance.now() - phaseStart);
+      if (profiling) perfMon.recordPhase('simulation_step', performance.now() - phaseStart, this._world.id);
 
       phaseStart = profiling ? performance.now() : 0;
       Telemetry.startSpan({
         operation: TelemetrySpanOperation.ENTITIES_EMIT_UPDATES,
       }, () => this._world.entityManager.checkAndEmitUpdates());
-      if (profiling) perfMon.recordPhase('entities_emit_updates', performance.now() - phaseStart);
+      if (profiling) perfMon.recordPhase('entities_emit_updates', performance.now() - phaseStart, this._world.id);
 
       if (this._world.networkSynchronizer.shouldSynchronize()) {
         phaseStart = profiling ? performance.now() : 0;
         Telemetry.startSpan({
           operation: TelemetrySpanOperation.NETWORK_SYNCHRONIZE,
         }, () => this._world.networkSynchronizer.synchronize());
-        if (profiling) perfMon.recordPhase('network_synchronize', performance.now() - phaseStart);
+        if (profiling) perfMon.recordPhase('network_synchronize', performance.now() - phaseStart, this._world.id);
       }
     });
 
     if (profiling) {
-      perfMon.endTick();
+      perfMon.endTick(this._world.id);
     }
 
     this._currentTick++;

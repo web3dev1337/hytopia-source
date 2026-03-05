@@ -1,12 +1,43 @@
 import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
 
+export interface ScenarioVector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface ScenarioAction {
-  type: 'spawn_bots' | 'despawn_bots' | 'spawn_entities' | 'load_map' | 'wait' | 'custom';
+  type:
+    | 'spawn_bots'
+    | 'despawn_bots'
+    | 'load_map'
+    | 'spawn_entities'
+    | 'despawn_entities'
+    | 'start_block_churn'
+    | 'stop_block_churn'
+    | 'create_worlds'
+    | 'set_default_world'
+    | 'clear_world'
+    | 'connect_clients'
+    | 'disconnect_clients'
+    | 'wait'
+    | 'custom';
   count?: number;
   behavior?: string;
   durationMs?: number;
   mapPath?: string;
+  worldId?: number;
+  kind?: 'model' | 'block';
+  tag?: string;
+  options?: Record<string, unknown>;
+  blocksPerTick?: number;
+  blockTypeId?: number;
+  mode?: 'toggle' | 'place' | 'remove';
+  min?: ScenarioVector3;
+  max?: ScenarioVector3;
+  setDefault?: boolean;
+  staggerMs?: number;
   script?: string;
 }
 

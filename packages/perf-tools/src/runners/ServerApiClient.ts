@@ -7,6 +7,18 @@ interface HealthResponse {
   playerCount?: number;
 }
 
+export interface NetworkSnapshot {
+  connectedPlayers: number;
+  bytesSentTotal: number;
+  bytesReceivedTotal: number;
+  bytesSentPerSecond: number;
+  bytesReceivedPerSecond: number;
+  packetsSentPerSecond: number;
+  packetsReceivedPerSecond: number;
+  avgSerializationMs: number;
+  compressionCount: number;
+}
+
 interface PerfSnapshotResponse {
   timestamp: number;
   avgTickMs: number;
@@ -24,12 +36,20 @@ interface PerfSnapshotResponse {
     maxMs: number;
   }>;
   memory: { heapUsedMb: number; heapTotalMb: number; rssMb: number };
+  network?: NetworkSnapshot;
 }
 
 export type ServerAction =
   | { type: 'spawn_bots'; count: number; behavior?: string }
   | { type: 'despawn_bots'; count?: number }
-  | { type: 'load_map'; mapPath: string }
+  | { type: 'load_map'; mapPath: string; worldId?: number }
+  | { type: 'spawn_entities'; count: number; kind?: 'model' | 'block'; options?: Record<string, unknown>; tag?: string }
+  | { type: 'despawn_entities'; tag?: string }
+  | { type: 'start_block_churn'; blocksPerTick: number; blockTypeId: number; mode?: 'toggle' | 'place' | 'remove'; min?: { x: number; y: number; z: number }; max?: { x: number; y: number; z: number } }
+  | { type: 'stop_block_churn' }
+  | { type: 'create_worlds'; count: number; mapPath?: string; setDefault?: boolean }
+  | { type: 'set_default_world'; worldId: number }
+  | { type: 'clear_world' }
   | { type: 'reset' };
 
 export default class ServerApiClient {
@@ -124,6 +144,7 @@ export default class ServerApiClient {
       budgetMs: data.budgetMs,
       operations: data.operations,
       memory: data.memory,
+      network: data.network,
     };
   }
 
@@ -135,4 +156,3 @@ export default class ServerApiClient {
     };
   }
 }
-

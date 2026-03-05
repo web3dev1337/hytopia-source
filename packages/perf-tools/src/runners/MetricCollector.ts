@@ -18,6 +18,17 @@ export interface ServerSnapshot {
   budgetMs: number;
   operations: Record<string, OperationSnapshot>;
   memory: { heapUsedMb: number; heapTotalMb: number; rssMb: number };
+  network?: {
+    connectedPlayers: number;
+    bytesSentTotal: number;
+    bytesReceivedTotal: number;
+    bytesSentPerSecond: number;
+    bytesReceivedPerSecond: number;
+    packetsSentPerSecond: number;
+    packetsReceivedPerSecond: number;
+    avgSerializationMs: number;
+    compressionCount: number;
+  };
 }
 
 export interface OperationSnapshot {

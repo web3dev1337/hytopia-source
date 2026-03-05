@@ -24,6 +24,15 @@ export default class ConsoleReporter {
       console.log(`Client FPS: ${b.avgFps.toFixed(1)} avg`);
     }
 
+    if (b.network) {
+      console.log('');
+      console.log('Network (server):');
+      console.log(`  bytes sent: avg=${(b.network.avgBytesSentPerSecond / 1_000_000).toFixed(2)}MB/s max=${(b.network.maxBytesSentPerSecond / 1_000_000).toFixed(2)}MB/s`);
+      console.log(`  bytes recv: avg=${(b.network.avgBytesReceivedPerSecond / 1_000_000).toFixed(2)}MB/s max=${(b.network.maxBytesReceivedPerSecond / 1_000_000).toFixed(2)}MB/s`);
+      console.log(`  totals: sent=${(b.network.totalBytesSent / 1_000_000).toFixed(1)}MB recv=${(b.network.totalBytesReceived / 1_000_000).toFixed(1)}MB players=${b.network.maxConnectedPlayers}`);
+      console.log(`  serialize: avg=${b.network.avgSerializationMs.toFixed(2)}ms compressTotal=${b.network.compressionCountTotal}`);
+    }
+
     const opNames = Object.keys(b.operations);
 
     if (opNames.length > 0) {
@@ -100,6 +109,13 @@ export default class ConsoleReporter {
 
       allPass = allPass && pass;
       console.log(`  ${pass ? 'PASS' : 'FAIL'} memory ${b.avgMemoryMb.toFixed(1)}MB <= ${t.memory_mb.max}MB`);
+    }
+
+    if (t.network?.maxBytesPerSecond !== undefined && b.network) {
+      const pass = b.network.maxBytesSentPerSecond <= t.network.maxBytesPerSecond;
+
+      allPass = allPass && pass;
+      console.log(`  ${pass ? 'PASS' : 'FAIL'} net maxBytesSent ${(b.network.maxBytesSentPerSecond / 1_000_000).toFixed(2)}MB/s <= ${(t.network.maxBytesPerSecond / 1_000_000).toFixed(2)}MB/s`);
     }
 
     console.log(`  Overall: ${allPass ? 'ALL PASS' : 'SOME FAILED'}`);

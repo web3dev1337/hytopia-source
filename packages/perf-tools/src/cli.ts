@@ -23,7 +23,7 @@ program
   .command('run')
   .description('Run a benchmark scenario')
   .argument('[scenario]', 'Path to scenario YAML/JSON file')
-  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined)')
+  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world)')
   .option('--output <path>', 'Write results to JSON file')
   .option('--full-data', 'Include raw metric data in output')
   .option('--baseline <path>', 'Compare results against a baseline JSON')
@@ -39,7 +39,7 @@ program
       const presetPath = path.join(__dirname, 'presets', `${options.preset}.yaml`);
 
       if (!fs.existsSync(presetPath)) {
-        console.error(`Unknown preset: ${options.preset}. Available: idle, stress, large-world, many-players, combined`);
+        console.error(`Unknown preset: ${options.preset}. Available: idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world`);
         process.exit(1);
       }
 
