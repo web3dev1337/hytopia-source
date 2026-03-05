@@ -11,6 +11,7 @@ import PerformanceMonitor from '@/metrics/PerformanceMonitor';
 import PlayerManager from '@/players/PlayerManager';
 import PerfBlockChurner from '@/perf/PerfBlockChurner';
 import type { PerfBlockChurnMode } from '@/perf/PerfBlockChurner';
+import PerfWorldGenerator from '@/perf/PerfWorldGenerator';
 import WorldManager from '@/worlds/WorldManager';
 import Entity from '@/worlds/entities/Entity';
 import { ColliderShape } from '@/worlds/physics/Collider';
@@ -30,6 +31,7 @@ type PerfAction =
   | { type: 'spawn_bots'; count: number; behavior?: string }
   | { type: 'despawn_bots'; count?: number }
   | { type: 'load_map'; mapPath: string; worldId?: number }
+  | { type: 'generate_blocks'; blockCount: number; blockTypeId: number; worldId?: number; layout?: 'dense' | 'slab'; slabHeight?: number; origin?: Vector3Like; clear?: boolean }
   | { type: 'spawn_entities'; count: number; kind?: 'model' | 'block'; options?: Record<string, unknown>; tag?: string }
   | { type: 'despawn_entities'; tag?: string }
   | { type: 'start_block_churn'; blocksPerTick: number; blockTypeId: number; mode?: PerfBlockChurnMode; min?: Vector3Like; max?: Vector3Like }
@@ -208,6 +210,26 @@ function loadMapFromAssets(mapPath: string, worldId?: number): { loaded: boolean
   world.loadMap(map);
 
   return { loaded: true, mapPath, worldId: world.id };
+}
+
+function generateBlocks(
+  blockCount: number,
+  blockTypeId: number,
+  worldId: number | undefined,
+  layout: 'dense' | 'slab' | undefined,
+  slabHeight: number | undefined,
+  origin: Vector3Like | undefined,
+  clear: boolean | undefined,
+) {
+  return PerfWorldGenerator.generateBlocks({
+    worldId,
+    blockCount,
+    blockTypeId,
+    layout,
+    slabHeight,
+    origin,
+    clear,
+  });
 }
 
 function spawnEntities(
@@ -563,6 +585,28 @@ export default class PerfHarness {
               }
 
               const result = loadMapFromAssets(action.mapPath, typeof action.worldId === 'number' ? action.worldId : undefined);
+              respondJson(res, 200, { ok: true, result });
+
+              return;
+            }
+            case 'generate_blocks': {
+              if (typeof action.blockCount !== 'number') {
+                return respondJson(res, 400, { ok: false, error: '"blockCount" is required' });
+              }
+
+              if (typeof action.blockTypeId !== 'number') {
+                return respondJson(res, 400, { ok: false, error: '"blockTypeId" is required' });
+              }
+
+              const result = generateBlocks(
+                action.blockCount,
+                action.blockTypeId,
+                typeof action.worldId === 'number' ? action.worldId : undefined,
+                action.layout === 'dense' || action.layout === 'slab' ? action.layout : undefined,
+                typeof action.slabHeight === 'number' ? action.slabHeight : undefined,
+                parseVector3Like(action.origin),
+                typeof action.clear === 'boolean' ? action.clear : undefined,
+              );
               respondJson(res, 200, { ok: true, result });
 
               return;

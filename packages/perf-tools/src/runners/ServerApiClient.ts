@@ -43,6 +43,7 @@ export type ServerAction =
   | { type: 'spawn_bots'; count: number; behavior?: string }
   | { type: 'despawn_bots'; count?: number }
   | { type: 'load_map'; mapPath: string; worldId?: number }
+  | { type: 'generate_blocks'; blockCount: number; blockTypeId: number; worldId?: number; layout?: 'dense' | 'slab'; slabHeight?: number; origin?: { x: number; y: number; z: number }; clear?: boolean }
   | { type: 'spawn_entities'; count: number; kind?: 'model' | 'block'; options?: Record<string, unknown>; tag?: string }
   | { type: 'despawn_entities'; tag?: string }
   | { type: 'start_block_churn'; blocksPerTick: number; blockTypeId: number; mode?: 'toggle' | 'place' | 'remove'; min?: { x: number; y: number; z: number }; max?: { x: number; y: number; z: number } }

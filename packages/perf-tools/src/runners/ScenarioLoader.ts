@@ -12,6 +12,7 @@ export interface ScenarioAction {
     | 'spawn_bots'
     | 'despawn_bots'
     | 'load_map'
+    | 'generate_blocks'
     | 'spawn_entities'
     | 'despawn_entities'
     | 'start_block_churn'
@@ -31,6 +32,11 @@ export interface ScenarioAction {
   kind?: 'model' | 'block';
   tag?: string;
   options?: Record<string, unknown>;
+  blockCount?: number;
+  layout?: 'dense' | 'slab';
+  slabHeight?: number;
+  origin?: ScenarioVector3;
+  clear?: boolean;
   blocksPerTick?: number;
   blockTypeId?: number;
   mode?: 'toggle' | 'place' | 'remove';

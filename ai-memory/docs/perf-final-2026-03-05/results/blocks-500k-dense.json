@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-03-05T11:48:56.811Z",
+  "scenario": "blocks-500k-dense",
+  "durationMs": 74184,
+  "baseline": {
+    "avgTickMs": 0.14140416256201357,
+    "maxTickMs": 17.655299999998533,
+    "p95TickMs": 0.37285456666710765,
+    "p99TickMs": 2.4301144666666006,
+    "ticksOverBudgetPct": 0.053255225669018774,
+    "avgMemoryMb": 48.43299166361491,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.0007039452957370873,
+        "p95Ms": 0.0010677333336388984
+      },
+      "physics_step": {
+        "avgMs": 0.01850606042002969,
+        "p95Ms": 0.028902466667204862
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0017545602051715224,
+        "p95Ms": 0.0029788333332362526
+      },
+      "simulation_step": {
+        "avgMs": 0.022470014284345127,
+        "p95Ms": 0.03584373333363449
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.0003423013221541184,
+        "p95Ms": 0.0005583499998768578
+      },
+      "world_tick": {
+        "avgMs": 0.13978336091750282,
+        "p95Ms": 0.3656250500001382
+      },
+      "ticker_tick": {
+        "avgMs": 0.17294758232436494,
+        "p95Ms": 0.4071851166677637
+      },
+      "send_all_packets": {
+        "avgMs": 0.1719061867245776,
+        "p95Ms": 0.6893992500004666
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.002408139111171516,
+        "p95Ms": 0.003817999999955646
+      },
+      "network_synchronize": {
+        "avgMs": 0.22191345575921226,
+        "p95Ms": 0.772945300000265
+      },
+      "serialize_packets": {
+        "avgMs": 1.198182509803827,
+        "p95Ms": 3.3448520000019926
+      },
+      "send_packets": {
+        "avgMs": 0.5832188880595591,
+        "p95Ms": 3.2410930000005465
+      }
+    },
+    "network": {
+      "totalBytesSent": 74510,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 20,
+      "avgBytesSentPerSecond": 733.0014737876572,
+      "maxBytesSentPerSecond": 43980.088427259434,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 2.292166734566154,
+      "maxPacketsSentPerSecond": 137.53000407396925,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 1.1953125294117746,
+      "compressionCountTotal": 20
+    }
+  },
+  "phases": [
+    {
+      "name": "setup-world",
+      "durationMs": 148,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 10005,
+      "collected": false
+    },
+    {
+      "name": "join-and-measure",
+      "durationMs": 58223,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}

@@ -1,0 +1,66 @@
+name: "blocks-1m-multi-world"
+description: "Create 4 worlds with ~1M blocks each, then connect clients in bursts per world"
+warmupMs: 5000
+phases:
+  - name: setup-worlds
+    actions:
+      - type: clear_world
+      - type: create_worlds
+        count: 3
+      - type: generate_blocks
+        worldId: 1
+        blockCount: 1000000
+        blockTypeId: 1
+        layout: dense
+      - type: generate_blocks
+        worldId: 2
+        blockCount: 1000000
+        blockTypeId: 1
+        layout: dense
+      - type: generate_blocks
+        worldId: 3
+        blockCount: 1000000
+        blockTypeId: 1
+        layout: dense
+      - type: generate_blocks
+        worldId: 4
+        blockCount: 1000000
+        blockTypeId: 1
+        layout: dense
+  - name: stabilize
+    duration: 10s
+  - name: joins-and-measure
+    collect: true
+    actions:
+      - type: set_default_world
+        worldId: 1
+      - type: connect_clients
+        count: 10
+      - type: wait
+        durationMs: 5000
+      - type: set_default_world
+        worldId: 2
+      - type: connect_clients
+        count: 10
+      - type: wait
+        durationMs: 5000
+      - type: set_default_world
+        worldId: 3
+      - type: connect_clients
+        count: 10
+      - type: wait
+        durationMs: 5000
+      - type: set_default_world
+        worldId: 4
+      - type: connect_clients
+        count: 10
+    duration: 90s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  network:
+    maxBytesPerSecond: 80000000
+  memory_mb:
+    max: 4000
+

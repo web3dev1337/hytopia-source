@@ -131,6 +131,18 @@ export default class BenchmarkRunner {
               worldId: typeof action.worldId === 'number' ? action.worldId : undefined,
             });
             break;
+          case 'generate_blocks':
+            await this._serverApi.action({
+              type: 'generate_blocks',
+              blockCount: action.blockCount ?? 0,
+              blockTypeId: action.blockTypeId ?? 1,
+              worldId: typeof action.worldId === 'number' ? action.worldId : undefined,
+              layout: action.layout,
+              slabHeight: action.slabHeight,
+              origin: action.origin,
+              clear: action.clear,
+            });
+            break;
           case 'spawn_entities':
             await this._serverApi.action({
               type: 'spawn_entities',
