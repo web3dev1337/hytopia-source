@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-03-05T13:33:35.440Z",
+  "scenario": "large-world",
+  "durationMs": 83198,
+  "baseline": {
+    "avgTickMs": 0.3502514052795173,
+    "maxTickMs": 0.9146570000011707,
+    "p95TickMs": 0.5091090999991744,
+    "p99TickMs": 0.598821266665982,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 43.48845672607422,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.041368946448760026,
+        "p95Ms": 0.06814049999908699
+      },
+      "physics_step": {
+        "avgMs": 0.24694364356640122,
+        "p95Ms": 0.3470961333325249
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0038016709050663227,
+        "p95Ms": 0.005615016666342854
+      },
+      "simulation_step": {
+        "avgMs": 0.2549660947558462,
+        "p95Ms": 0.35964101666668286
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.02854657873016627,
+        "p95Ms": 0.04696543333381366
+      },
+      "send_all_packets": {
+        "avgMs": 0.0028167214646624707,
+        "p95Ms": 0.004112333333857047
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.005738166117265033,
+        "p95Ms": 0.007642583333169265
+      },
+      "network_synchronize": {
+        "avgMs": 0.026373561114945786,
+        "p95Ms": 0.040851699998953946
+      },
+      "world_tick": {
+        "avgMs": 0.34763314835848064,
+        "p95Ms": 0.49770978333429716
+      },
+      "ticker_tick": {
+        "avgMs": 0.38605935829633026,
+        "p95Ms": 0.549840633333406
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "load-world",
+      "durationMs": 5579,
+      "collected": false
+    },
+    {
+      "name": "spawn-bots",
+      "durationMs": 152,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 10004,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 57934,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}
