@@ -394,61 +394,42 @@ All files referenced below are imported under `ai-memory/docs/perf-external-note
 
 ---
 
-## Performance Framework (this PR branch) — Review + Merge Blockers
+## Performance Framework (this PR branch) — Review + Current State
 
 This section reviews the “performance framework” implementation added in PR #11 (server module + `packages/perf-tools/` + GitHub Actions).
 
 ### What’s real and useful today (server-side)
 
 - **`PerformanceMonitor` exists and is integrated** into the tick loop:
-  - `server/src/metrics/PerformanceMonitor.ts` implements tick history, per-operation stats (p50/p95/p99), spike detection, and periodic snapshots.
+  - `server/src/metrics/PerformanceMonitor.ts` implements tick history, per-operation stats (p50/p95/p99), spike detection, and snapshots.
   - `server/src/worlds/WorldLoop.ts` calls `beginTick()` / `recordPhase()` / `endTick()` when enabled.
-- **Decorators/helpers exist**:
-  - `server/src/metrics/Monitor.ts` adds `@Monitor` / `@MonitorClass` + `monitorBlock` helpers.
-- **CPU/heap capture exists (debug tooling)**:
-  - `server/src/metrics/CpuProfiler.ts` uses `node:inspector` to capture `.cpuprofile` and heap snapshots.
-- **Bots exist** (useful for stress testing once the harness is wired):
-  - `server/src/bots/*` exports `BotManager`, `BotPlayer`, and behaviors.
+- **Operation double-counting is fixed**
+  - `WorldLoop.recordPhase(...)` now only records per-tick phase breakdown (not per-operation stats), so `Telemetry.startSpan(...)` + `perfMon.measure(...)` remains the single source of truth for operation timings.
+- **`NetworkMetrics` is now integrated**
+  - Wired into `server/src/networking/Connection.ts` (bytes/packets + serialization/compression) and `server/src/players/PlayerManager.ts` (connected player count).
+- **Perf harness endpoints are wired** (internal, env-gated):
+  - When `HYTOPIA_PERF_TOOLS=1`, the server exposes:
+    - `GET /__perf/snapshot`
+    - `POST /__perf/reset`
+    - `POST /__perf/action` (`spawn_bots`, `despawn_bots`, `load_map`, `reset`)
+- **A dedicated perf harness server entry exists**
+  - `server/src/perf/perf-harness.ts` → built via `server` script `build:perf-harness` to `server/src/perf-harness.mjs`.
+- **`packages/perf-tools/` runs end-to-end for server benchmarks**
+  - Lockfile added (so `npm ci` works in CI).
+  - Preset loading fixed (`import.meta.url` → real dirname) and presets are copied into `dist/`.
+  - The runner starts the perf harness server, executes scenario actions via `/__perf/action`, and polls `/__perf/snapshot` to produce baselines.
 
-### What’s missing / incorrect vs the PR summary (must fix)
+### Remaining gaps / limitations
 
-1) **Operation timings are currently double-counted**
-   - When `PerformanceMonitor` is enabled, `Telemetry.startSpan()` wraps operations in `perfMon.measure(...)`.
-   - `WorldLoop` also calls `perfMon.recordPhase(...)` for the same operation names (`entities_tick`, `simulation_step`, `network_synchronize`, etc.).
-   - Result: per-operation percentiles/averages in `PerformanceMonitor` are inflated and misleading.
-
-2) **`NetworkMetrics` is not actually integrated**
-   - `server/src/metrics/NetworkMetrics.ts` is exported, but nothing calls `recordBytesSent/Received`, `recordPacketSent/Received`, etc.
-   - As written, it stays at zero unless a game manually wires it into networking.
-
-3) **`packages/perf-tools/` is not runnable end-to-end yet**
-   - **CI will fail immediately**: workflows run `npm ci` in `packages/perf-tools/`, but there is no `package-lock.json`.
-   - **CLI preset loading likely breaks at runtime**: uses `import.meta.dirname` (Node uses `import.meta.url` + `fileURLToPath`).
-   - **Scenario actions are placeholders**: `spawn_bots`, `load_map`, etc. only log “would execute via server API”.
-   - **Server metrics aren’t collected**: `MetricCollector` supports server snapshots, but the runner never pulls them from the server.
-   - **Client metrics assume missing instrumentation**: `HeadlessClient` reads `window.__HYTOPIA_PERF__`, which the client does not currently define.
-
-4) **The GitHub Actions workflows aren’t a “gate” yet**
-   - Bench steps are `continue-on-error: true`, and compare uses `|| true`, so regressions won’t fail the job even if the tooling worked.
-   - Baseline update also treats benchmark failures as non-fatal, which risks caching empty/invalid baselines.
-
-### Minimal path to make this framework usable
-
-If you want this PR to be mergeable as a framework (not just scaffolding), the smallest concrete checklist is:
-
-- Fix the double-counting: pick **one** source of truth (either `recordPhase` or `Telemetry.startSpan` → `perfMon.measure`) for operation timing.
-- Wire `NetworkMetrics` into `server/src/networking/Connection.ts` and/or `NetworkSynchronizer.ts`.
-- Make `perf-tools` installable and runnable in CI:
-  - add a lockfile and keep `npm ci`, or switch workflows to `npm install`.
-  - fix preset path resolution (`import.meta.url`).
-- Define a real metrics channel:
-  - either expose `PerformanceMonitor.getSnapshot()` via an HTTP debug endpoint, or log JSON snapshots to stdout and parse them.
-  - add a client-side hook for `HeadlessClient` (even a minimal `window.__HYTOPIA_PERF__ = { fps, ... }` populated from existing managers).
-- Make the workflows enforce regressions (remove `continue-on-error` / `|| true` once results are trustworthy).
-
-### Naming/hygiene
-
-- This branch contains an internal notes folder name that should be renamed to a neutral label before merging.
+- **Client-side metrics are not collected yet**
+  - `HeadlessClient` (Puppeteer) still expects `window.__HYTOPIA_PERF__`, which the client does not currently define.
+  - The current runner focuses on **server** metrics (tick + memory + ops). The optional `scenario.clients` setting creates WebSocket connections (server-side “players”), but no FPS stats are collected.
+- **No per-tick event stream yet**
+  - `MetricCollector` supports tick reports/spikes, but `perf-tools` currently collects periodic snapshots only.
+- **Network metrics are collected but not surfaced in reports**
+  - Server tracks bytes/packets/serialization/compression via `NetworkMetrics`, but the perf-tools baseline/report format doesn’t include it yet.
+- **The GitHub Actions workflows aren’t a hard gate yet**
+  - Bench steps remain `continue-on-error: true`, and compare uses `|| true`.
 
 ---
 
@@ -458,30 +439,47 @@ This section is a factual log of what was executed against the current PR #11 br
 
 ### Server runtime smoke test (engine boot + tick + bots)
 
-- Built `server/src/index.ts` with Bun and executed it with Node (local dev runtime).
 - Started the engine via `startServer(...)`.
 - Loaded `assets/release/maps/boilerplate-small.json`.
-- Enabled profiling with one line: `PerformanceMonitor.instance.enable({ snapshotIntervalMs: 0 })`.
+- Enabled profiling: `PerformanceMonitor.instance.enable({ snapshotIntervalMs: 0 })`.
 - Enabled per-entity profiling: `PerformanceMonitor.instance.enableEntityProfiling(true)`.
-- Spawned **25 bots** using `BotManager.instance.spawnBots(...)` with `RandomWalkBehavior`.
-- Observed ongoing `PerformanceMonitorEvent.TICK_REPORT` events and captured a snapshot after ~5s post-start:
+- Spawned **25 bots** (`RandomWalkBehavior`).
+- Captured a snapshot after ~5s post-start:
   - `avgTickMs=0.252`, `p95TickMs=0.382`, `p99TickMs=0.550`, `maxTickMs=12.509`, `ticksOverBudget=0`, `totalTicks=301` (0 players connected).
 
-### Bugs found during the smoke test
+### perf-tools end-to-end benchmarks (server-only snapshots)
 
-- Bot spawning triggered recoverable runtime errors from `RigidBody.setEnabledRotations()` when bots use a non-dynamic rigid body type.
-  - Fixed by only applying `enabledRotations` when the bot rigid body type is `DYNAMIC`.
+Results JSON (generated by `packages/perf-tools`):
+
+- `ai-memory/docs/perf-final-2026-03-05/results/idle.json`
+- `ai-memory/docs/perf-final-2026-03-05/results/stress.json`
+
+#### Idle preset (`idle-baseline`)
+
+- Warmup: 5s, Measure: 30s
+- No real browser clients connected, no bots
+- Baseline:
+  - `avgTickMs=0.04`, `p99TickMs=0.13`, `maxTickMs=0.88`, `avgHeap=40.5MB`
+
+#### Stress preset (`stress-test`)
+
+- Warmup: 5s
+- Actions:
+  - Load map: `assets/maps/boilerplate-small.json`
+  - Spawn bots: 50 `random_walk`, 30 `chase`, 20 `interact` (100 total)
+- Stabilize: 5s, Measure: 60s
+- Baseline:
+  - `avgTickMs=0.28`, `p99TickMs=1.37`, `maxTickMs=2.68`, `avgHeap=47.3MB`
 
 ### Client build check
 
 - `client` production build passed (`tsc` + `vite build`) after removing an unused local in `client/src/network/NetworkManager.ts`.
 
-### Not tested / not runnable end-to-end yet
+### Not tested
 
 - No `sdk-examples/*` games were run.
-- No real client gameplay session was connected to the server (so join/reconnect chunk streaming and networking hot paths were not exercised).
-- `packages/perf-tools` CLI and GitHub Actions “perf gate” workflows were **not** run successfully as an end-to-end benchmark, because the tooling does not yet collect real server/client metrics and has install/runtime issues described above.
+- No real browser gameplay session was used for these benchmarks (no FPS numbers; networking is only exercised if presets specify `clients`).
 
 ### Environment limitations observed
 
-- WebTransport http3-quiche native addon was not available in this environment, so WebTransport/QUIC wasn’t exercised (server still started with fallback behavior).
+- WebTransport http3-quiche native addon was not available in this environment, so WebTransport/QUIC wasn’t exercised (server used WebSocket transport).

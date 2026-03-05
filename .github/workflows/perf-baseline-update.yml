@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Map local.hytopiahosting.com to localhost
+        run: echo "127.0.0.1 local.hytopiahosting.com" | sudo tee -a /etc/hosts
+
       - name: Install server dependencies
         run: cd server && npm ci
 
@@ -33,7 +36,7 @@ jobs:
         run: cd server && npm run build
 
       - name: Install perf-tools
-        run: cd packages/perf-tools && npm ci && npm run build
+        run: cd packages/perf-tools && PUPPETEER_SKIP_DOWNLOAD=true npm ci && npm run build
 
       - name: Run benchmarks (3 rounds, averaged)
         run: |

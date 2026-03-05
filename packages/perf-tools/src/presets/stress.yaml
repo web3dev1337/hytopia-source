@@ -1,9 +1,11 @@
 name: "stress-test"
-description: "Stress test with 500 entities and 100 bots performing various actions"
+description: "Stress test with 100 bots performing various actions"
 warmupMs: 5000
 phases:
   - name: spawn-entities
     actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
       - type: spawn_bots
         count: 50
         behavior: random_walk

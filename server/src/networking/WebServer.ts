@@ -7,6 +7,7 @@ import AssetsLibrary from '@/assets/AssetsLibrary';
 import ErrorHandler from '@/errors/ErrorHandler';
 import EventRouter from '@/events/EventRouter';
 import PlayerManager from '@/players/PlayerManager';
+import PerfHarness from '@/perf/PerfHarness';
 import { SSL_CERT, SSL_KEY } from '@/networking/ssl/certs';
 import type { Socket as RawSocket } from 'net';
 import type { Session } from '@/networking/PlatformGateway';
@@ -150,6 +151,8 @@ export default class WebServer extends EventRouter {
       return ErrorHandler.warning('WebServer.start(): already started');
     }
 
+    PerfHarness.enableIfConfigured();
+
     this._server = http2.createSecureServer({ key: SSL_KEY, cert: SSL_CERT, allowHTTP1: true });
     this._server.on('request', this._onRequest); // Works for both HTTP/1.1 and HTTP/2 (via compat layer)
     this._server.on('upgrade', this._onUpgrade);
@@ -213,6 +216,10 @@ export default class WebServer extends EventRouter {
         playerCount: PlayerManager.instance.playerCount,
       }) : undefined);
 
+      return;
+    }
+
+    if (PerfHarness.handleWebRequest(req, res)) {
       return;
     }
 

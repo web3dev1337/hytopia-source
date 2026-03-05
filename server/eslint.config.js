@@ -3,10 +3,12 @@ import tseslint from 'typescript-eslint';
 import tsdoc from 'eslint-plugin-tsdoc';
 
 export default tseslint.config(
+  {
+    ignores: ['./build/**/*', './dist/**/*', './src/**/*.mjs'],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
-    ignores: ['./build/**/*', './dist/**/*'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

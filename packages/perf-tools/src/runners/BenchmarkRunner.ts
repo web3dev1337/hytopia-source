@@ -1,6 +1,10 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import MetricCollector, { type CollectedMetrics } from './MetricCollector.js';
-import HeadlessClient from './HeadlessClient.js';
+import ServerApiClient from './ServerApiClient.js';
+import WsClient from './WsClient.js';
 import { type Scenario, type ScenarioPhase, parseDuration } from './ScenarioLoader.js';
 import type { BaselineResult } from './BaselineComparer.js';
 
@@ -30,19 +34,20 @@ export default class BenchmarkRunner {
   private _options: Required<BenchmarkRunnerOptions>;
   private _collector: MetricCollector;
   private _serverProcess: ChildProcess | null = null;
-  private _clients: HeadlessClient[] = [];
+  private _serverApi: ServerApiClient;
+  private _wsClients: WsClient[] = [];
   private _log: (msg: string) => void;
 
   constructor(options?: BenchmarkRunnerOptions) {
     this._options = {
-      serverCommand: 'npm run dev',
-      serverCwd: '.',
-      clientUrl: 'http://localhost:8080',
-      headless: true,
-      verbose: false,
-      ...options,
+      serverCommand: options?.serverCommand ?? 'npm run build:perf-harness && node src/perf-harness.mjs',
+      serverCwd: options?.serverCwd ?? resolveDefaultServerCwd(process.cwd()),
+      clientUrl: options?.clientUrl ?? 'https://local.hytopiahosting.com:8080',
+      headless: options?.headless ?? true,
+      verbose: options?.verbose ?? false,
     };
     this._collector = new MetricCollector();
+    this._serverApi = new ServerApiClient(this._options.clientUrl);
     this._log = this._options.verbose ? console.log : () => {};
   }
 
@@ -53,12 +58,11 @@ export default class BenchmarkRunner {
     this._log(`[bench] Starting scenario: ${scenario.name}`);
 
     try {
-      if (scenario.serverScript) {
-        await this._startServer(scenario.serverScript);
-      }
+      await this._startServer();
+      await this._serverApi.waitForHealthy();
 
       if (scenario.clients && scenario.clients > 0) {
-        await this._launchClients(scenario.clients);
+        await this._launchWsClients(scenario.clients);
       }
 
       if (scenario.warmupMs) {
@@ -93,6 +97,7 @@ export default class BenchmarkRunner {
     this._log(`[bench] Phase: ${phase.name}`);
 
     if (phase.collect) {
+      await this._serverApi.reset();
       this._collector.startCollecting();
     }
 
@@ -107,11 +112,27 @@ export default class BenchmarkRunner {
             }
             break;
           case 'spawn_bots':
+            await this._serverApi.action({
+              type: 'spawn_bots',
+              count: action.count ?? 0,
+              behavior: action.behavior,
+            });
+            break;
           case 'despawn_bots':
-          case 'spawn_entities':
+            await this._serverApi.action({
+              type: 'despawn_bots',
+              count: action.count,
+            });
+            break;
           case 'load_map':
+            await this._serverApi.action({
+              type: 'load_map',
+              mapPath: action.mapPath ?? '',
+            });
+            break;
+          case 'spawn_entities':
           case 'custom':
-            this._log(`[bench]   Action ${action.type} - would execute via server API`);
+            throw new Error(`Action not supported yet: ${action.type}`);
             break;
         }
       }
@@ -132,6 +153,11 @@ export default class BenchmarkRunner {
   }
 
   private async _collectDuring(durationMs: number): Promise<void> {
+    if (!this._collector.isCollecting) {
+      await this._wait(durationMs);
+      return;
+    }
+
     const intervalMs = 1000;
     const intervals = Math.ceil(durationMs / intervalMs);
 
@@ -140,54 +166,70 @@ export default class BenchmarkRunner {
 
       await this._wait(remaining);
 
-      for (const client of this._clients) {
-        const snapshot = await client.collectClientMetrics();
-
-        if (snapshot) {
-          this._collector.addClientSnapshot(snapshot);
-        }
-      }
+      const snapshot = await this._serverApi.snapshot();
+      this._collector.addServerSnapshot(snapshot);
     }
   }
 
-  private async _startServer(scriptPath: string): Promise<void> {
-    this._log(`[bench] Starting server: ${scriptPath}`);
+  private async _startServer(): Promise<void> {
+    const baseUrl = new URL(this._options.clientUrl);
+    const startPort = baseUrl.port ? Number(baseUrl.port) : (baseUrl.protocol === 'https:' ? 443 : 80);
+    const port = await pickAvailablePort(startPort);
+    const finalUrl = new URL(this._options.clientUrl);
 
-    const [cmd, ...args] = this._options.serverCommand.split(' ');
+    finalUrl.port = String(port);
+    this._options.clientUrl = finalUrl.toString();
+    this._serverApi = new ServerApiClient(this._options.clientUrl);
 
-    this._serverProcess = spawn(cmd, args, {
+    this._log(`[bench] Starting server (cwd=${this._options.serverCwd}): ${this._options.serverCommand}`);
+    this._log(`[bench] Using server URL: ${this._options.clientUrl}`);
+
+    this._serverProcess = spawn(this._options.serverCommand, {
       cwd: this._options.serverCwd,
+      shell: true,
+      detached: true,
       stdio: this._options.verbose ? 'inherit' : 'pipe',
-      env: { ...process.env, PERF_SCRIPT: scriptPath },
+      env: {
+        ...process.env,
+        HYTOPIA_PERF_TOOLS: '1',
+        NODE_ENV: 'production',
+        PORT: String(port),
+      },
     });
-
-    await this._wait(3000);
   }
 
-  private async _launchClients(count: number): Promise<void> {
-    this._log(`[bench] Launching ${count} headless client(s)`);
+  private async _launchWsClients(count: number): Promise<void> {
+    const wsUrl = toWebSocketUrl(this._options.clientUrl);
+
+    this._log(`[bench] Launching ${count} WebSocket client(s): ${wsUrl}`);
 
     for (let i = 0; i < count; i++) {
-      const client = new HeadlessClient({
-        url: this._options.clientUrl,
-        headless: this._options.headless,
-      });
-
-      await client.launch();
-      await client.navigate();
-      this._clients.push(client);
+      const client = new WsClient({ url: wsUrl });
+      await client.connect();
+      this._wsClients.push(client);
     }
   }
 
   private async _cleanup(): Promise<void> {
-    for (const client of this._clients) {
+    for (const client of this._wsClients) {
       await client.close();
     }
 
-    this._clients = [];
+    this._wsClients = [];
 
     if (this._serverProcess) {
-      this._serverProcess.kill('SIGTERM');
+      const pid = this._serverProcess.pid;
+
+      try {
+        if (pid) {
+          process.kill(-pid, 'SIGTERM');
+        } else {
+          this._serverProcess.kill('SIGTERM');
+        }
+      } catch {
+        this._serverProcess.kill('SIGTERM');
+      }
+
       this._serverProcess = null;
     }
   }
@@ -249,4 +291,59 @@ export default class BenchmarkRunner {
   private _wait(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+}
+
+function resolveDefaultServerCwd(startDir: string): string {
+  let dir = startDir;
+
+  for (let i = 0; i < 8; i++) {
+    const serverPkg = path.join(dir, 'server', 'package.json');
+
+    if (fs.existsSync(serverPkg)) {
+      return path.join(dir, 'server');
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return path.join(startDir, 'server');
+}
+
+function toWebSocketUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = '/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+async function pickAvailablePort(startPort: number): Promise<number> {
+  const minPort = Math.max(1, Math.floor(startPort));
+
+  for (let port = minPort; port < minPort + 50; port++) {
+    // eslint-disable-next-line no-await-in-loop
+    const available = await canListen(port);
+    if (available) return port;
+  }
+
+  throw new Error(`No available port found (starting from ${startPort})`);
+}
+
+async function canListen(port: number): Promise<boolean> {
+  return await new Promise(resolve => {
+    const server = net.createServer();
+
+    server.unref();
+
+    server.once('error', () => {
+      resolve(false);
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      server.close(() => resolve(true));
+    });
+  });
 }

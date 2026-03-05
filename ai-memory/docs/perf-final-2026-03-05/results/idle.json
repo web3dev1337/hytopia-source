@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-03-05T08:02:48.070Z",
+  "scenario": "idle-baseline",
+  "durationMs": 34422,
+  "baseline": {
+    "avgTickMs": 0.04203972943437319,
+    "maxTickMs": 0.8820090000008349,
+    "p95TickMs": 0.07541519999955805,
+    "p99TickMs": 0.1272069999999682,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 40.52041803995768,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.001114420389146293,
+        "p95Ms": 0.0017866333328129258
+      },
+      "physics_step": {
+        "avgMs": 0.02166873620451,
+        "p95Ms": 0.03330013333309883
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0027704908231093355,
+        "p95Ms": 0.0042436666669649035
+      },
+      "simulation_step": {
+        "avgMs": 0.02700019616574194,
+        "p95Ms": 0.045443866666695004
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.0005000602500278144,
+        "p95Ms": 0.000681066666766128
+      },
+      "send_all_packets": {
+        "avgMs": 0.0030847504849194677,
+        "p95Ms": 0.004832866666977982
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.001912261431047877,
+        "p95Ms": 0.0025155333334320553
+      },
+      "network_synchronize": {
+        "avgMs": 0.011556394492309798,
+        "p95Ms": 0.017829233333516943
+      },
+      "world_tick": {
+        "avgMs": 0.04017091732958176,
+        "p95Ms": 0.07022670000002715
+      },
+      "ticker_tick": {
+        "avgMs": 0.07093715680076258,
+        "p95Ms": 0.11399493333340918
+      }
+    }
+  },
+  "phases": [
+    {
+      "name": "warmup",
+      "durationMs": 4286,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 29458,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 30,
+    "clientSnapshotCount": 0
+  }
+}

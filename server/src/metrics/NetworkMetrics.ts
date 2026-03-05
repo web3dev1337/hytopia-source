@@ -54,6 +54,11 @@ export default class NetworkMetrics {
     this._enabled = false;
   }
 
+  public reset(): void {
+    this._lastSnapshotTime = performance.now();
+    this._reset();
+  }
+
   public setConnectedPlayers(count: number): void {
     this._connectedPlayers = count;
   }

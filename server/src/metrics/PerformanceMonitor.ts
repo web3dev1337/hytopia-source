@@ -208,7 +208,6 @@ export default class PerformanceMonitor extends EventRouter {
 
   public recordPhase(phaseName: string, durationMs: number): void {
     this._currentPhases[phaseName] = durationMs;
-    this._recordOperation(phaseName, durationMs);
   }
 
   public endTick(): void {

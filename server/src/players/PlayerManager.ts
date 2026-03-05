@@ -1,6 +1,7 @@
 import { ConnectionEvent } from '@/networking/Connection';
 import EventRouter from '@/events/EventRouter';
 import ErrorHandler from '@/errors/ErrorHandler';
+import NetworkMetrics from '@/metrics/NetworkMetrics';
 import PersistenceManager from '@/persistence/PersistenceManager';
 import Player from '@/players/Player';
 import WorldManager from '@/worlds/WorldManager';
@@ -167,6 +168,7 @@ export default class PlayerManager {
     player.joinWorld(world ?? WorldManager.instance.getDefaultWorld());
 
     this._connectionPlayers.set(connection, player);
+    NetworkMetrics.instance.setConnectedPlayers(this.playerCount);
   }
 
   /** @internal */
@@ -207,6 +209,7 @@ export default class PlayerManager {
       }
 
       EventRouter.globalInstance.emit(PlayerManagerEvent.PLAYER_DISCONNECTED, { player });
+      NetworkMetrics.instance.setConnectedPlayers(this.playerCount);
     } else {
       ErrorHandler.warning(`PlayerManager._onConnectionClosed(): Connection ${connection.id} not in the PlayerManager._connectionPlayers map.`);
     }

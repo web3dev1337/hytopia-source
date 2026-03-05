@@ -1,1 +1,4 @@
 node_modules/
+server/src/playground.mjs
+server/src/perf-harness.mjs
+packages/*/dist/

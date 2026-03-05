@@ -5,7 +5,7 @@ phases:
   - name: load-world
     actions:
       - type: load_map
-        mapPath: "assets/maps/large-test-world.json"
+        mapPath: "assets/maps/boilerplate.json"
   - name: spawn-bots
     actions:
       - type: spawn_bots

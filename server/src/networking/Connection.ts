@@ -5,6 +5,7 @@ import protocol from '@hytopia.com/server-protocol';
 import ErrorHandler from '@/errors/ErrorHandler';
 import EventRouter from '@/events/EventRouter';
 import msgpackr from '@/shared/helpers/msgpackr';
+import NetworkMetrics from '@/metrics/NetworkMetrics';
 import Telemetry, { TelemetrySpanOperation } from '@/metrics/Telemetry';
 import type { AnyPacket } from '@hytopia.com/server-protocol';
 import type { MessageEvent, ErrorEvent } from 'ws';
@@ -177,15 +178,28 @@ export default class Connection extends EventRouter {
         'packetIds': packets.map(p => p[0]).join(','),
       },
     }, span => {
+      const netMetrics = NetworkMetrics.instance;
+      const recordNetwork = netMetrics.isEnabled;
+      const start = recordNetwork ? performance.now() : 0;
+
       let outputBuffer = msgpackr.pack(packets);
       
-      if (outputBuffer.byteLength > 64 * 1024) { // Compress packets larger than 64kb, mainly chunks.
+      const shouldCompress = outputBuffer.byteLength > 64 * 1024;
+
+      if (shouldCompress) { // Compress packets larger than 64kb, mainly chunks.
         outputBuffer = gzipSync(outputBuffer, { level: 1 });
       }
 
       span?.setAttribute('serializedBytes', outputBuffer.byteLength);
 
       Connection._cachedPacketsSerializedBuffer.set(packets, outputBuffer);
+
+      if (recordNetwork) {
+        netMetrics.recordSerialization(performance.now() - start);
+        if (shouldCompress) {
+          netMetrics.recordCompression();
+        }
+      }
 
       return outputBuffer;
     });
@@ -406,10 +420,18 @@ export default class Connection extends EventRouter {
 
         if (!serializedBuffer) return; // failed to serialize.
 
+        const netMetrics = NetworkMetrics.instance;
+        const recordNetwork = netMetrics.isEnabled;
+
+        let bytesSent = serializedBuffer.byteLength;
+
         if (wtConnected) {
           if (reliable || serializedBuffer.byteLength > 1200) { // Unreliable Datagram cannot handle > 1200 bytes, we should make this dynamic based on session.
             // Webtransport reliable streams don't frame and will chunk data we MUST frame packets ourselves.
-            this._wtReliableWriter?.write(protocol.framePacketBuffer(serializedBuffer)).catch(() => {
+            const framed = protocol.framePacketBuffer(serializedBuffer);
+            bytesSent = framed.byteLength;
+
+            this._wtReliableWriter?.write(framed).catch(() => {
               ErrorHandler.error('Connection.send(): WebTransport reliable write failed, connection closing?');
             });
           } else {
@@ -419,6 +441,13 @@ export default class Connection extends EventRouter {
           }
         } else {
           this._ws!.send(serializedBuffer);
+        }
+
+        if (recordNetwork) {
+          netMetrics.recordBytesSent(bytesSent);
+          for (let i = 0; i < packets.length; i++) {
+            netMetrics.recordPacketSent();
+          }
         }
 
         this.emitWithGlobal(ConnectionEvent.PACKETS_SENT, {
@@ -439,6 +468,14 @@ export default class Connection extends EventRouter {
   };
 
   private _onMessage = (data: Buffer): void => {
+    const netMetrics = NetworkMetrics.instance;
+    const recordNetwork = netMetrics.isEnabled;
+
+    if (recordNetwork) {
+      netMetrics.recordBytesReceived(data.byteLength);
+      netMetrics.recordPacketReceived();
+    }
+
     try {
       const packet = this._deserialize(data);
 

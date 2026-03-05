@@ -2,12 +2,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { loadScenario } from './runners/ScenarioLoader.js';
 import BenchmarkRunner from './runners/BenchmarkRunner.js';
 import BaselineComparer from './runners/BaselineComparer.js';
 import ConsoleReporter from './reporters/ConsoleReporter.js';
 import JsonReporter from './reporters/JsonReporter.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const program = new Command();
 
@@ -24,16 +27,16 @@ program
   .option('--output <path>', 'Write results to JSON file')
   .option('--full-data', 'Include raw metric data in output')
   .option('--baseline <path>', 'Compare results against a baseline JSON')
-  .option('--server-cmd <cmd>', 'Command to start the game server', 'npm run dev')
-  .option('--server-cwd <path>', 'Working directory for server', '.')
-  .option('--client-url <url>', 'Client URL', 'http://localhost:8080')
+  .option('--server-cmd <cmd>', 'Command to start the game server')
+  .option('--server-cwd <path>', 'Working directory for server')
+  .option('--client-url <url>', 'Server base URL (used for health + perf endpoints)', 'https://local.hytopiahosting.com:8080')
   .option('--no-headless', 'Run browser in visible mode')
   .option('--verbose', 'Enable verbose logging')
   .action(async (scenarioPath, options) => {
     let scenario;
 
     if (options.preset) {
-      const presetPath = path.join(import.meta.dirname, 'presets', `${options.preset}.yaml`);
+      const presetPath = path.join(__dirname, 'presets', `${options.preset}.yaml`);
 
       if (!fs.existsSync(presetPath)) {
         console.error(`Unknown preset: ${options.preset}. Available: idle, stress, large-world, many-players, combined`);
@@ -123,7 +126,7 @@ program
   .command('presets')
   .description('List available built-in presets')
   .action(() => {
-    const presetsDir = path.join(import.meta.dirname, 'presets');
+    const presetsDir = path.join(__dirname, 'presets');
 
     if (!fs.existsSync(presetsDir)) {
       console.log('No presets directory found');

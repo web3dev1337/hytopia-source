@@ -16,6 +16,7 @@ PROTOCOL: protocol/ - Packet schemas + definitions (@hytopia.com/server-protocol
 SDK:      sdk/ - Git submodule → hytopiagg/sdk (build output lands here)
 EXAMPLES: sdk-examples/ - Reference games built with the SDK
 ASSETS:   assets/release/ - Default game assets (audio, blocks, maps, models, particles, skyboxes, ui)
+PERF:     packages/perf-tools/ - Benchmark CLI + trace analysis (`hytopia-bench`)
 CONFIG:   package.json - Monorepo root (npm workspaces)
           server/package.json - Server deps + build scripts
           server/tsconfig.json - Strict TS, path alias @/* → ./src/*
@@ -140,9 +141,16 @@ shared/types/math/Vector3Like.ts - Vector3 interface
 errors/ErrorHandler.ts - Fatal error handling + crash protection
 events/EventRouter.ts - Typed event emitter (eventemitter3)
 events/Events.ts - Event payload type definitions
+bots/BotManager.ts, bots/BotPlayer.ts - Server-side bot players for perf/stress tests
+metrics/Monitor.ts - @Monitor decorators + helper wrappers
+metrics/CpuProfiler.ts - V8 CPU profile + heap snapshot capture (debug tooling)
+metrics/PerformanceMonitor.ts - Tick profiler + operation percentiles + spikes
+metrics/NetworkMetrics.ts - Byte/packet/serialization counters
 metrics/Telemetry.ts - Span-based performance profiling
 models/ModelRegistry.ts - GLTF model preloading + bounding box extraction
 persistence/PersistenceManager.ts - Player/global KV storage via @hytopia.com/save-states
+perf/PerfHarness.ts - Env-gated /__perf endpoints for perf-tools
+perf/perf-harness.ts - Benchmark server entry (build:perf-harness → src/perf-harness.mjs)
 server/src/assets/AssetsLibrary.ts - Asset path resolution
 ```
 
