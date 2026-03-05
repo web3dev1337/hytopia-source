@@ -1,66 +1,81 @@
 {
-  "timestamp": "2026-03-05T08:02:48.070Z",
+  "timestamp": "2026-03-05T10:12:51.999Z",
   "scenario": "idle-baseline",
-  "durationMs": 34422,
+  "durationMs": 34964,
   "baseline": {
-    "avgTickMs": 0.04203972943437319,
-    "maxTickMs": 0.8820090000008349,
-    "p95TickMs": 0.07541519999955805,
-    "p99TickMs": 0.1272069999999682,
+    "avgTickMs": 0.04679685049276594,
+    "maxTickMs": 0.7618509999992966,
+    "p95TickMs": 0.08563006666624157,
+    "p99TickMs": 0.14175990000006397,
     "ticksOverBudgetPct": 0,
-    "avgMemoryMb": 40.52041803995768,
+    "avgMemoryMb": 40.66230392456055,
     "operations": {
       "entities_tick": {
-        "avgMs": 0.001114420389146293,
-        "p95Ms": 0.0017866333328129258
+        "avgMs": 0.0013375285718636284,
+        "p95Ms": 0.0020908666665794347
       },
       "physics_step": {
-        "avgMs": 0.02166873620451,
-        "p95Ms": 0.03330013333309883
+        "avgMs": 0.02362913038497697,
+        "p95Ms": 0.037648333333769796
       },
       "physics_cleanup": {
-        "avgMs": 0.0027704908231093355,
-        "p95Ms": 0.0042436666669649035
+        "avgMs": 0.0029344255942972772,
+        "p95Ms": 0.004569666666156991
       },
       "simulation_step": {
-        "avgMs": 0.02700019616574194,
-        "p95Ms": 0.045443866666695004
+        "avgMs": 0.02947926233473994,
+        "p95Ms": 0.04859916666643282
       },
       "entities_emit_updates": {
-        "avgMs": 0.0005000602500278144,
-        "p95Ms": 0.000681066666766128
-      },
-      "send_all_packets": {
-        "avgMs": 0.0030847504849194677,
-        "p95Ms": 0.004832866666977982
-      },
-      "network_synchronize_cleanup": {
-        "avgMs": 0.001912261431047877,
-        "p95Ms": 0.0025155333334320553
-      },
-      "network_synchronize": {
-        "avgMs": 0.011556394492309798,
-        "p95Ms": 0.017829233333516943
+        "avgMs": 0.0004343184789922846,
+        "p95Ms": 0.0007068999998409708
       },
       "world_tick": {
-        "avgMs": 0.04017091732958176,
-        "p95Ms": 0.07022670000002715
+        "avgMs": 0.04458446096775077,
+        "p95Ms": 0.07784126666668574
       },
       "ticker_tick": {
-        "avgMs": 0.07093715680076258,
-        "p95Ms": 0.11399493333340918
+        "avgMs": 0.07767732243819857,
+        "p95Ms": 0.125281199999669
+      },
+      "send_all_packets": {
+        "avgMs": 0.003018038009964449,
+        "p95Ms": 0.005092800000026424
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.0021036462653031196,
+        "p95Ms": 0.003053333333173214
+      },
+      "network_synchronize": {
+        "avgMs": 0.012486877813969597,
+        "p95Ms": 0.020697799999864704
       }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
     }
   },
   "phases": [
     {
       "name": "warmup",
-      "durationMs": 4286,
+      "durationMs": 5002,
       "collected": false
     },
     {
       "name": "measure",
-      "durationMs": 29458,
+      "durationMs": 29290,
       "collected": true
     }
   ],

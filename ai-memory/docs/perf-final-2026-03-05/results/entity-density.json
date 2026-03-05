@@ -1,54 +1,54 @@
 {
-  "timestamp": "2026-03-05T10:14:08.480Z",
-  "scenario": "stress-test",
-  "durationMs": 68941,
+  "timestamp": "2026-03-05T10:28:40.896Z",
+  "scenario": "entity-density",
+  "durationMs": 74447,
   "baseline": {
-    "avgTickMs": 0.25662994207978596,
-    "maxTickMs": 2.328760999998849,
-    "p95TickMs": 0.43224216666612847,
-    "p99TickMs": 1.2698941333335219,
+    "avgTickMs": 0.35446141580684515,
+    "maxTickMs": 1.217609999992419,
+    "p95TickMs": 0.49880955000010846,
+    "p99TickMs": 0.6524828166667854,
     "ticksOverBudgetPct": 0,
-    "avgMemoryMb": 46.99844512939453,
+    "avgMemoryMb": 44.66063092549642,
     "operations": {
       "entities_tick": {
-        "avgMs": 0.08646684851703983,
-        "p95Ms": 0.1446740333327701
+        "avgMs": 0.016547232843148327,
+        "p95Ms": 0.025251083333538798
       },
       "physics_step": {
-        "avgMs": 0.08340307568625353,
-        "p95Ms": 0.12420135000017278
+        "avgMs": 0.13449901648284898,
+        "p95Ms": 0.18499565000129223
       },
       "physics_cleanup": {
-        "avgMs": 0.00210539873287511,
-        "p95Ms": 0.0033580500001638334
+        "avgMs": 0.002322116057727884,
+        "p95Ms": 0.0033113166655918272
       },
       "simulation_step": {
-        "avgMs": 0.08810355751048535,
-        "p95Ms": 0.13298310000024383
+        "avgMs": 0.1396163369787168,
+        "p95Ms": 0.19289864999897569
       },
       "entities_emit_updates": {
-        "avgMs": 0.05982602447784044,
-        "p95Ms": 0.09787540000033915
+        "avgMs": 0.1810740421472613,
+        "p95Ms": 0.2781539166659362
       },
       "send_all_packets": {
-        "avgMs": 0.0026767473524755537,
-        "p95Ms": 0.0041315499996623355
+        "avgMs": 0.0023587110905412306,
+        "p95Ms": 0.0033070833336751094
       },
       "network_synchronize_cleanup": {
-        "avgMs": 0.004177543891797372,
-        "p95Ms": 0.005747166666393847
+        "avgMs": 0.004359490449905124,
+        "p95Ms": 0.005840849999397809
       },
       "network_synchronize": {
-        "avgMs": 0.02764730996719078,
-        "p95Ms": 0.04289294999938041
+        "avgMs": 0.01736202156468164,
+        "p95Ms": 0.024285166667020044
       },
       "world_tick": {
-        "avgMs": 0.2544640216211446,
-        "p95Ms": 0.4325516666674048
+        "avgMs": 0.35252660842303335,
+        "p95Ms": 0.4856061166657431
       },
       "ticker_tick": {
-        "avgMs": 0.28816852412366506,
-        "p95Ms": 0.4896158333333915
+        "avgMs": 0.3828609000750609,
+        "p95Ms": 0.5241929000011017
       }
     },
     "network": {
@@ -69,18 +69,18 @@
   },
   "phases": [
     {
-      "name": "spawn-entities",
-      "durationMs": 180,
+      "name": "setup",
+      "durationMs": 181,
       "collected": false
     },
     {
       "name": "stabilize",
-      "durationMs": 5001,
+      "durationMs": 10008,
       "collected": false
     },
     {
       "name": "measure",
-      "durationMs": 58086,
+      "durationMs": 58586,
       "collected": true
     }
   ],

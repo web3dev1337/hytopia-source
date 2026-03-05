@@ -1,84 +1,99 @@
 {
-  "timestamp": "2026-03-05T08:33:27.416Z",
+  "timestamp": "2026-03-05T10:19:41.066Z",
   "scenario": "combined-stress",
-  "durationMs": 148543,
+  "durationMs": 146434,
   "baseline": {
-    "avgTickMs": 1.6246458165157687,
-    "maxTickMs": 117.65480500000558,
-    "p95TickMs": 1.1247772083339138,
-    "p99TickMs": 4.320444258331311,
-    "ticksOverBudgetPct": 0.8500557413600892,
-    "avgMemoryMb": 64.21133410135904,
+    "avgTickMs": 1.7669154759255734,
+    "maxTickMs": 119.1145120000001,
+    "p95TickMs": 1.315517916666431,
+    "p99TickMs": 4.684417033333982,
+    "ticksOverBudgetPct": 0.8499649331407365,
+    "avgMemoryMb": 63.636258125305176,
     "operations": {
       "entities_tick": {
-        "avgMs": 0.06023534214868161,
-        "p95Ms": 0.09285301666759552
+        "avgMs": 0.0728528046739081,
+        "p95Ms": 0.1221807416680349
       },
       "physics_step": {
-        "avgMs": 1.314700189717483,
-        "p95Ms": 0.5700750083333029
+        "avgMs": 1.408065831620104,
+        "p95Ms": 0.6354630583336378
       },
       "physics_cleanup": {
-        "avgMs": 0.002085650584596271,
-        "p95Ms": 0.0030714333330858303
+        "avgMs": 0.0030421108487570497,
+        "p95Ms": 0.00449195000016213
       },
       "simulation_step": {
-        "avgMs": 1.3197706446445352,
-        "p95Ms": 0.5771322249997259
+        "avgMs": 1.414739001908914,
+        "p95Ms": 0.645052208334073
       },
       "entities_emit_updates": {
-        "avgMs": 0.05804956685453903,
-        "p95Ms": 0.08771780000139794
-      },
-      "world_tick": {
-        "avgMs": 1.6331770308059,
-        "p95Ms": 1.1152968916647297
-      },
-      "ticker_tick": {
-        "avgMs": 1.676339860219361,
-        "p95Ms": 1.174580299999828
+        "avgMs": 0.06617845378886872,
+        "p95Ms": 0.10611717500141822
       },
       "serialize_packets": {
-        "avgMs": 0.018518397704499326,
-        "p95Ms": 0.028155433331782356
+        "avgMs": 0.02305844670776388,
+        "p95Ms": 0.03494735000109964
       },
       "send_packets": {
-        "avgMs": 0.03408368015064002,
-        "p95Ms": 0.09443360000065391
+        "avgMs": 0.03796243016453969,
+        "p95Ms": 0.11168594166689824
       },
       "send_all_packets": {
-        "avgMs": 0.35896385172022055,
-        "p95Ms": 0.5381129500002619
+        "avgMs": 0.40120493518422384,
+        "p95Ms": 0.6376426833339792
       },
       "network_synchronize_cleanup": {
-        "avgMs": 0.003422776250948875,
-        "p95Ms": 0.004683658332063108
+        "avgMs": 0.00435136068161182,
+        "p95Ms": 0.00610366666696791
       },
       "network_synchronize": {
-        "avgMs": 0.37832787548255975,
-        "p95Ms": 0.5595540250004282
+        "avgMs": 0.4263879479175249,
+        "p95Ms": 0.6685033583338736
+      },
+      "world_tick": {
+        "avgMs": 1.7746799205055102,
+        "p95Ms": 1.3021827249979347
+      },
+      "ticker_tick": {
+        "avgMs": 1.8245079275256666,
+        "p95Ms": 1.3848611416666852
       }
+    },
+    "network": {
+      "totalBytesSent": 32907550,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 10,
+      "avgBytesSentPerSecond": 266178.4396486531,
+      "maxBytesSentPerSecond": 396740.41631734296,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 294.4515047767222,
+      "maxPacketsSentPerSecond": 329.0251711324992,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0.02127565248229243,
+      "compressionCountTotal": 0
     }
   },
   "phases": [
     {
       "name": "load-world",
-      "durationMs": 6054,
+      "durationMs": 5110,
       "collected": false
     },
     {
       "name": "spawn-all",
-      "durationMs": 689,
+      "durationMs": 760,
       "collected": false
     },
     {
       "name": "stabilize",
-      "durationMs": 9133,
+      "durationMs": 10001,
       "collected": false
     },
     {
       "name": "measure",
-      "durationMs": 121159,
+      "durationMs": 119529,
       "collected": true
     }
   ],
