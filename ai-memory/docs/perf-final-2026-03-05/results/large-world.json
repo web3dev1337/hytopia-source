@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-03-05T08:29:15.218Z",
+  "scenario": "large-world",
+  "durationMs": 84907,
+  "baseline": {
+    "avgTickMs": 0.27393310057401493,
+    "maxTickMs": 0.9869840000028489,
+    "p95TickMs": 0.3828831500003313,
+    "p99TickMs": 0.5447322499994698,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 88.77384020487467,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.02464061749755326,
+        "p95Ms": 0.04236551666575299
+      },
+      "physics_step": {
+        "avgMs": 0.2065711943411591,
+        "p95Ms": 0.2736408833337919
+      },
+      "physics_cleanup": {
+        "avgMs": 0.002082314511966274,
+        "p95Ms": 0.0030974166671512648
+      },
+      "simulation_step": {
+        "avgMs": 0.2116222404007795,
+        "p95Ms": 0.28152733333299695
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.021980974957498556,
+        "p95Ms": 0.03847450000030221
+      },
+      "world_tick": {
+        "avgMs": 0.272743909880828,
+        "p95Ms": 0.3734315500005929
+      },
+      "ticker_tick": {
+        "avgMs": 0.30299386042646737,
+        "p95Ms": 0.4100281333328894
+      },
+      "send_all_packets": {
+        "avgMs": 0.0017612591724411868,
+        "p95Ms": 0.002773616668431108
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.0033801205431956945,
+        "p95Ms": 0.00522951666625886
+      },
+      "network_synchronize": {
+        "avgMs": 0.016153427484475177,
+        "p95Ms": 0.024212966666467158
+      }
+    }
+  },
+  "phases": [
+    {
+      "name": "load-world",
+      "durationMs": 6103,
+      "collected": false
+    },
+    {
+      "name": "spawn-bots",
+      "durationMs": 179,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 9163,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 58773,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}

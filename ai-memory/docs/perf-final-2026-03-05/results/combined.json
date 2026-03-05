@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-03-05T08:33:27.416Z",
+  "scenario": "combined-stress",
+  "durationMs": 148543,
+  "baseline": {
+    "avgTickMs": 1.6246458165157687,
+    "maxTickMs": 117.65480500000558,
+    "p95TickMs": 1.1247772083339138,
+    "p99TickMs": 4.320444258331311,
+    "ticksOverBudgetPct": 0.8500557413600892,
+    "avgMemoryMb": 64.21133410135904,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.06023534214868161,
+        "p95Ms": 0.09285301666759552
+      },
+      "physics_step": {
+        "avgMs": 1.314700189717483,
+        "p95Ms": 0.5700750083333029
+      },
+      "physics_cleanup": {
+        "avgMs": 0.002085650584596271,
+        "p95Ms": 0.0030714333330858303
+      },
+      "simulation_step": {
+        "avgMs": 1.3197706446445352,
+        "p95Ms": 0.5771322249997259
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.05804956685453903,
+        "p95Ms": 0.08771780000139794
+      },
+      "world_tick": {
+        "avgMs": 1.6331770308059,
+        "p95Ms": 1.1152968916647297
+      },
+      "ticker_tick": {
+        "avgMs": 1.676339860219361,
+        "p95Ms": 1.174580299999828
+      },
+      "serialize_packets": {
+        "avgMs": 0.018518397704499326,
+        "p95Ms": 0.028155433331782356
+      },
+      "send_packets": {
+        "avgMs": 0.03408368015064002,
+        "p95Ms": 0.09443360000065391
+      },
+      "send_all_packets": {
+        "avgMs": 0.35896385172022055,
+        "p95Ms": 0.5381129500002619
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.003422776250948875,
+        "p95Ms": 0.004683658332063108
+      },
+      "network_synchronize": {
+        "avgMs": 0.37832787548255975,
+        "p95Ms": 0.5595540250004282
+      }
+    }
+  },
+  "phases": [
+    {
+      "name": "load-world",
+      "durationMs": 6054,
+      "collected": false
+    },
+    {
+      "name": "spawn-all",
+      "durationMs": 689,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 9133,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 121159,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 120,
+    "clientSnapshotCount": 0
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-03-05T08:30:48.908Z",
+  "scenario": "many-players",
+  "durationMs": 83093,
+  "baseline": {
+    "avgTickMs": 0.6470265995516347,
+    "maxTickMs": 4.203389000002062,
+    "p95TickMs": 1.6269400499999391,
+    "p99TickMs": 2.1103549333337166,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 43.294999567667645,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.04735350895084237,
+        "p95Ms": 0.08498573333278424
+      },
+      "physics_step": {
+        "avgMs": 0.03551447968858303,
+        "p95Ms": 0.05286774999998064
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0017913868605565167,
+        "p95Ms": 0.002568766666505932
+      },
+      "simulation_step": {
+        "avgMs": 0.03923516544657127,
+        "p95Ms": 0.05986169999917668
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.03855938052634314,
+        "p95Ms": 0.06088985000048221
+      },
+      "world_tick": {
+        "avgMs": 0.6457899452704966,
+        "p95Ms": 1.640317100000478
+      },
+      "ticker_tick": {
+        "avgMs": 0.675227684528368,
+        "p95Ms": 1.6709995000013198
+      },
+      "serialize_packets": {
+        "avgMs": 0.018892928437028597,
+        "p95Ms": 0.0341168166673621
+      },
+      "send_packets": {
+        "avgMs": 0.01959014294244713,
+        "p95Ms": 0.04560398333281531
+      },
+      "send_all_packets": {
+        "avgMs": 1.010612902026956,
+        "p95Ms": 1.657106016666997
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.0036523557310532053,
+        "p95Ms": 0.005459899999793075
+      },
+      "network_synchronize": {
+        "avgMs": 1.0305746473852164,
+        "p95Ms": 1.6906612666663325
+      }
+    }
+  },
+  "phases": [
+    {
+      "name": "connect-clients",
+      "durationMs": 9150,
+      "collected": false
+    },
+    {
+      "name": "spawn-bots",
+      "durationMs": 80,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 59452,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}
