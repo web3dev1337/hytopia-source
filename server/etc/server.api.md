@@ -1184,6 +1184,9 @@ export class Entity extends RigidBody implements protocol.Serializable {
     setBlockTextureUri(blockTextureUri: string | undefined): void;
     setEmissiveColor(emissiveColor: RgbColor | undefined): void;
     setEmissiveIntensity(emissiveIntensity: number | undefined): void;
+    setModelAnimationsPlaybackRate(playbackRate: number): void;
+    setModelNodeEmissiveColor(nodeName: string, color: RgbColor | undefined): void;
+    setModelNodeEmissiveIntensity(nodeName: string, intensity: number | undefined): void;
     setModelScale(modelScale: Vector3Like | number): void;
     setModelScaleInterpolationMs(interpolationMs: number | undefined): void;
     setModelTextureUri(modelTextureUri: string | undefined): void;
@@ -1194,6 +1197,8 @@ export class Entity extends RigidBody implements protocol.Serializable {
     setRotationInterpolationMs(interpolationMs: number | undefined): void;
     setTintColor(tintColor: RgbColor | undefined): void;
     spawn(world: World, position: Vector3Like, rotation?: QuaternionLike): void;
+    startModelLoopedAnimations(names: readonly string[]): void;
+    startModelOneshotAnimations(names: readonly string[]): void;
     stopAllModelAnimations(exclusionFilter?: (modelAnimation: Readonly<EntityModelAnimation>) => boolean): void;
     stopModelAnimations(modelAnimationNames: readonly string[]): void;
     get tag(): string | undefined;

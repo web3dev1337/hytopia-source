@@ -3622,6 +3622,52 @@ export declare class Entity extends RigidBody implements protocol.Serializable {
      */
     getModelAnimation(name: string): EntityModelAnimation | undefined;
     /**
+     * Sets the playback rate for all of the entity's model animations.
+     *
+     * @remarks
+     * A value of 1 is normal speed, 0.5 is half speed, 2 is double speed.
+     * A negative value will play the animation in reverse.
+     *
+     * @param playbackRate - The playback rate of the entity's model animations.
+     *
+     * **Category:** Entities
+     */
+    setModelAnimationsPlaybackRate(playbackRate: number): void;
+    /**
+     * Starts looped animations by name on this entity's model.
+     *
+     * @param names - Animation names to start looping.
+     *
+     * **Category:** Entities
+     */
+    startModelLoopedAnimations(names: readonly string[]): void;
+    /**
+     * Starts one-shot animations by name on this entity's model.
+     *
+     * @param names - Animation names to play once.
+     *
+     * **Category:** Entities
+     */
+    startModelOneshotAnimations(names: readonly string[]): void;
+    /**
+     * Sets the emissive color for a model node by name.
+     *
+     * @param nodeName - The node name to target.
+     * @param color - The RGB color to set, or undefined to clear.
+     *
+     * **Category:** Entities
+     */
+    setModelNodeEmissiveColor(nodeName: string, color: RgbColor | undefined): void;
+    /**
+     * Sets the emissive intensity for a model node by name.
+     *
+     * @param nodeName - The node name to target.
+     * @param intensity - The intensity value to set, or undefined to clear.
+     *
+     * **Category:** Entities
+     */
+    setModelNodeEmissiveIntensity(nodeName: string, intensity: number | undefined): void;
+    /**
      * Gets or lazily creates a model node override for the entity's model.
      *
      * @remarks

@@ -13,6 +13,7 @@
 - [x] Verified: stress benchmark — CPU avg=2.9% max=13%, RSS 196MB
 - [x] Verified: --no-perf-api mode — OS-only monitoring works
 - [x] Verified: --log-file option — server output captured to file
-- [x] HyFire2 — API breaks (WorldMapChunkCacheCodec/WorldMapFileLoader removed in 0.15.2)
-- [x] Zoo game — API breaks (setModelAnimationsPlaybackRate not in published 0.15.2)
-- [ ] Game benchmarks blocked — both games need SDK version alignment (upstream issue)
+- [x] HyFire2 — restored map compression codecs from feature/map-compression branch
+- [x] Zoo game — added missing Entity methods (setModelAnimationsPlaybackRate, startModelLoopedAnimations, startModelOneshotAnimations, setModelNodeEmissiveColor, setModelNodeEmissiveIntensity)
+- [x] HyFire2 benchmark — PASS: avg tick 0.61ms, p99 1.34ms, 431MB heap, 1.2GB RSS
+- [x] Zoo Game benchmark (full PerfHarness) — PASS: avg tick 0.25ms, p99 0.85ms, 313MB heap, 782MB RSS

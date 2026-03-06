@@ -18580,6 +18580,187 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "server!Entity#setModelAnimationsPlaybackRate:member(1)",
+              "docComment": "/**\n * Sets the playback rate for all of the entity's model animations.\n *\n * @remarks\n *\n * A value of 1 is normal speed, 0.5 is half speed, 2 is double speed. A negative value will play the animation in reverse.\n *\n * @param playbackRate - The playback rate of the entity's model animations.\n *\n * **Category:** Entities\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setModelAnimationsPlaybackRate(playbackRate: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "playbackRate",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "setModelAnimationsPlaybackRate"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "server!Entity#setModelNodeEmissiveColor:member(1)",
+              "docComment": "/**\n * Sets the emissive color for a model node by name.\n *\n * @param nodeName - The node name to target.\n *\n * @param color - The RGB color to set, or undefined to clear.\n *\n * **Category:** Entities\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setModelNodeEmissiveColor(nodeName: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", color: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "RgbColor",
+                  "canonicalReference": "server!RgbColor:interface"
+                },
+                {
+                  "kind": "Content",
+                  "text": " | undefined"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 6,
+                "endIndex": 7
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "nodeName",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "color",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 5
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "setModelNodeEmissiveColor"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "server!Entity#setModelNodeEmissiveIntensity:member(1)",
+              "docComment": "/**\n * Sets the emissive intensity for a model node by name.\n *\n * @param nodeName - The node name to target.\n *\n * @param intensity - The intensity value to set, or undefined to clear.\n *\n * **Category:** Entities\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "setModelNodeEmissiveIntensity(nodeName: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", intensity: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "number | undefined"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "nodeName",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "intensity",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "setModelNodeEmissiveIntensity"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "server!Entity#setModelScale:member(1)",
               "docComment": "/**\n * Sets the scale of the entity's model and proportionally scales its colliders.\n *\n * @remarks\n *\n * Model entities only; no effect for block entities.\n *\n * **Collider scaling is relative:** Colliders are scaled by the ratio of new/old scale, not set to absolute values. Example: scaling from 1 to 2 doubles collider size; scaling from 2 to 4 also doubles it.\n *\n * **Reference equality check:** Uses `===` to compare with current scale, so passing the same object reference will early return even if values changed. Always pass a new object.\n *\n * @param modelScale - The scale of the entity's model. Can be a vector or a number for uniform scaling.\n *\n * **Side effects:** Scales existing colliders and emits `EntityEvent.SET_MODEL_SCALE` when spawned.\n *\n * **Category:** Entities\n */\n",
               "excerptTokens": [
@@ -19179,6 +19360,102 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "spawn"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "server!Entity#startModelLoopedAnimations:member(1)",
+              "docComment": "/**\n * Starts looped animations by name on this entity's model.\n *\n * @param names - Animation names to start looping.\n *\n * **Category:** Entities\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "startModelLoopedAnimations(names: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "readonly string[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "names",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "startModelLoopedAnimations"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "server!Entity#startModelOneshotAnimations:member(1)",
+              "docComment": "/**\n * Starts one-shot animations by name on this entity's model.\n *\n * @param names - Animation names to play once.\n *\n * **Category:** Entities\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "startModelOneshotAnimations(names: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "readonly string[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "void"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "names",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "startModelOneshotAnimations"
             },
             {
               "kind": "Method",

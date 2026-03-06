@@ -1,7 +1,7 @@
 import protocol from '@hytopia.com/server-protocol';
 import Collider, { ColliderShape } from '@/worlds/physics/Collider';
 import CollisionGroupsBuilder, { CollisionGroup } from '@/worlds/physics/CollisionGroupsBuilder';
-import EntityModelAnimation from '@/worlds/entities/EntityModelAnimation';
+import EntityModelAnimation, { EntityModelAnimationLoopMode } from '@/worlds/entities/EntityModelAnimation';
 import EntityModelNodeOverride from '@/worlds/entities/EntityModelNodeOverride';
 import ErrorHandler from '@/errors/ErrorHandler';
 import ModelRegistry from '@/models/ModelRegistry';
@@ -838,8 +838,89 @@ export default class Entity extends RigidBody implements protocol.Serializable {
   }
 
   /**
+   * Sets the playback rate for all of the entity's model animations.
+   *
+   * @remarks
+   * A value of 1 is normal speed, 0.5 is half speed, 2 is double speed.
+   * A negative value will play the animation in reverse.
+   *
+   * @param playbackRate - The playback rate of the entity's model animations.
+   *
+   * **Category:** Entities
+   */
+  public setModelAnimationsPlaybackRate(playbackRate: number) {
+    if (!this.isModelEntity) return;
+
+    for (const animation of this._modelAnimations.values()) {
+      animation.setPlaybackRate(playbackRate);
+    }
+  }
+
+  /**
+   * Starts looped animations by name on this entity's model.
+   *
+   * @param names - Animation names to start looping.
+   *
+   * **Category:** Entities
+   */
+  public startModelLoopedAnimations(names: readonly string[]) {
+    if (!this.isModelEntity) return;
+
+    for (const name of names) {
+      const anim = this.getModelAnimation(name);
+      if (!anim) continue;
+      anim.setLoopMode(EntityModelAnimationLoopMode.LOOP);
+      anim.play();
+    }
+  }
+
+  /**
+   * Starts one-shot animations by name on this entity's model.
+   *
+   * @param names - Animation names to play once.
+   *
+   * **Category:** Entities
+   */
+  public startModelOneshotAnimations(names: readonly string[]) {
+    if (!this.isModelEntity) return;
+
+    for (const name of names) {
+      const anim = this.getModelAnimation(name);
+      if (!anim) continue;
+      anim.setLoopMode(EntityModelAnimationLoopMode.ONCE);
+      anim.play();
+    }
+  }
+
+  /**
+   * Sets the emissive color for a model node by name.
+   *
+   * @param nodeName - The node name to target.
+   * @param color - The RGB color to set, or undefined to clear.
+   *
+   * **Category:** Entities
+   */
+  public setModelNodeEmissiveColor(nodeName: string, color: RgbColor | undefined) {
+    const override = this.getModelNodeOverride(nodeName);
+    if (override) override.setEmissiveColor(color);
+  }
+
+  /**
+   * Sets the emissive intensity for a model node by name.
+   *
+   * @param nodeName - The node name to target.
+   * @param intensity - The intensity value to set, or undefined to clear.
+   *
+   * **Category:** Entities
+   */
+  public setModelNodeEmissiveIntensity(nodeName: string, intensity: number | undefined) {
+    const override = this.getModelNodeOverride(nodeName);
+    if (override) override.setEmissiveIntensity(intensity);
+  }
+
+  /**
    * Gets or lazily creates a model node override for the entity's model.
-   * 
+   *
    * @remarks
    * Model entities only; returns `undefined` for block entities.
    * If the override does not yet exist, a new instance with default settings is created
