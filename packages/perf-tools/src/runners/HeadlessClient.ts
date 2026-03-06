@@ -80,7 +80,7 @@ export default class HeadlessClient {
 
     target.searchParams.set('perf', '1');
 
-    await page.goto(target.toString(), { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(target.toString(), { waitUntil: 'load', timeout: 60000 });
     this._connected = true;
   }
 

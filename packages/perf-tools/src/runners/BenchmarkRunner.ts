@@ -89,29 +89,34 @@ export default class BenchmarkRunner {
 
       // Launch headless client if configured
       if (this._options.withClient && this._options.clientDevUrl) {
-        this._log(`[bench] Launching headless client: ${this._options.clientDevUrl}`);
+        try {
+          this._log(`[bench] Launching headless client: ${this._options.clientDevUrl}`);
 
-        this._headlessClient = new HeadlessClient({
-          url: this._options.clientDevUrl,
-          headless: this._options.headless,
-        });
+          this._headlessClient = new HeadlessClient({
+            url: this._options.clientDevUrl,
+            headless: this._options.headless,
+          });
 
-        await this._headlessClient.launch();
+          await this._headlessClient.launch();
 
-        // Navigate with ?join=<server host> and ?perf=1 (auto-appended by HeadlessClient)
-        const serverUrl = new URL(this._options.clientUrl);
-        const clientNavUrl = new URL(this._options.clientDevUrl);
+          // Navigate with ?join=<server host> and ?perf=1 (auto-appended by HeadlessClient)
+          const serverUrl = new URL(this._options.clientUrl);
+          const clientNavUrl = new URL(this._options.clientDevUrl);
 
-        clientNavUrl.searchParams.set('join', serverUrl.host);
+          clientNavUrl.searchParams.set('join', serverUrl.host);
 
-        await this._headlessClient.navigate(clientNavUrl.toString());
+          await this._headlessClient.navigate(clientNavUrl.toString());
 
-        const perfReady = await this._headlessClient.waitForPerfReady(30000);
+          const perfReady = await this._headlessClient.waitForPerfReady(30000);
 
-        if (!perfReady) {
-          this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
-        } else {
-          this._log('[bench] Client perf bridge ready');
+          if (!perfReady) {
+            this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
+          } else {
+            this._log('[bench] Client perf bridge ready');
+          }
+        } catch (err: any) {
+          this._log(`[bench] WARNING: Headless client failed to launch: ${err?.message ?? err}`);
+          this._headlessClient = null;
         }
       }
 
