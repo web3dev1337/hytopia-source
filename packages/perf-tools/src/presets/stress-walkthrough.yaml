@@ -1,0 +1,78 @@
+name: "stress-walkthrough"
+description: "Deterministic stress test: 200 idle entities at fixed positions, player walks through them on a repeatable path"
+warmupMs: 5000
+phases:
+  - name: spawn-entities
+    actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
+      # All bots use idle behavior = they stay at their deterministic spawn positions
+      # (circle around 0,10,0 with radius based on sqrt(count))
+      - type: spawn_bots
+        count: 200
+        behavior: idle
+  - name: wait-for-world
+    actions:
+      - type: wait_for_entities
+        count: 10
+        durationMs: 30000
+      # Let entities fully load and settle
+      - type: wait
+        durationMs: 5000
+  - name: walkthrough
+    collect: true
+    duration: 45s
+    actions:
+      # Face toward entity cluster center (yaw=0 = looking along +Z toward origin)
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 500
+      # Walk forward into the entity cluster
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      # Turn right 90 degrees and strafe through entities
+      - type: set_camera
+        yaw: -1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      # Turn to face back through entities (180 from start)
+      - type: set_camera
+        yaw: 3.14
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      # Turn left 90 and walk through again
+      - type: set_camera
+        yaw: 1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      # Face original direction, walk forward again
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+thresholds:
+  tick_duration_ms:
+    avg: 12
+    p95: 15
+    p99: 20
+  memory_mb:
+    max: 512
+  client:
+    fps_avg: 15
+    draw_calls_max: 200
+    triangles_max: 1000000
+    frame_time_ms_max: 200

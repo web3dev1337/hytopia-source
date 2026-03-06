@@ -1,0 +1,107 @@
+{
+  "timestamp": "2026-03-06T05:25:52.669Z",
+  "scenario": "stress-walkthrough",
+  "durationMs": 93623,
+  "baseline": {
+    "avgTickMs": 0.4463646582871844,
+    "maxTickMs": 9.024755000005825,
+    "p95TickMs": 0.920134800000071,
+    "p99TickMs": 1.746577422222577,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 43.593108622233075,
+    "avgFps": 23.727272727272727,
+    "client": {
+      "avgFps": 23.727272727272727,
+      "minFps": 0,
+      "avgFrameTimeMs": 152.19772727347234,
+      "avgDrawCalls": 17.75,
+      "maxDrawCalls": 82,
+      "avgTriangles": 155875.47727272726,
+      "maxTriangles": 584747,
+      "avgGeometries": 63,
+      "avgEntities": 15.545454545454545,
+      "avgVisibleChunks": 64.06818181818181,
+      "avgUsedMemoryMb": 220.8743019104004
+    },
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.12082475065899774,
+        "p95Ms": 0.212825199998608
+      },
+      "physics_step": {
+        "avgMs": 0.12011465469852715,
+        "p95Ms": 0.1786375777785401
+      },
+      "physics_cleanup": {
+        "avgMs": 0.006925774357740608,
+        "p95Ms": 0.007451844444989951
+      },
+      "simulation_step": {
+        "avgMs": 0.13415876547377642,
+        "p95Ms": 0.20245715555631452
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.15868798814720403,
+        "p95Ms": 0.2651034888884169
+      },
+      "world_tick": {
+        "avgMs": 0.44518506949526604,
+        "p95Ms": 0.8249018000006294
+      },
+      "ticker_tick": {
+        "avgMs": 0.5173913805869171,
+        "p95Ms": 0.9369601777788679
+      },
+      "send_all_packets": {
+        "avgMs": 0.0055072860737605586,
+        "p95Ms": 0.00635031110970077
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.005068940954863205,
+        "p95Ms": 0.0048210888887600355
+      },
+      "network_synchronize": {
+        "avgMs": 0.02610076192554791,
+        "p95Ms": 0.02581884444480238
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "spawn-entities",
+      "durationMs": 232,
+      "collected": false
+    },
+    {
+      "name": "wait-for-world",
+      "durationMs": 5576,
+      "collected": false
+    },
+    {
+      "name": "walkthrough",
+      "durationMs": 79685,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 45,
+    "clientSnapshotCount": 44
+  }
+}

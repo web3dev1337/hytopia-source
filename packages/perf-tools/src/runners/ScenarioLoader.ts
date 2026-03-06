@@ -23,11 +23,19 @@ export interface ScenarioAction {
     | 'connect_clients'
     | 'disconnect_clients'
     | 'wait'
+    | 'walk_player'
+    | 'wait_for_entities'
+    | 'set_camera'
+    | 'throttle_cpu'
     | 'custom';
   count?: number;
   behavior?: string;
   durationMs?: number;
   mapPath?: string;
+  position?: ScenarioVector3;
+  yaw?: number;
+  pitch?: number;
+  rate?: number;
   worldId?: number;
   kind?: 'model' | 'block';
   tag?: string;

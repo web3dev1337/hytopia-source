@@ -278,6 +278,73 @@ export default class BenchmarkRunner {
           case 'disconnect_clients':
             await this._disconnectWsClients(action.count);
             break;
+          case 'wait_for_entities':
+            if (this._headlessClient) {
+              const minEntities = action.count ?? 1;
+              const timeout = action.durationMs ?? 30000;
+
+              this._log(`[bench]   Waiting for ${minEntities}+ entities (timeout ${timeout}ms)`);
+
+              const start = Date.now();
+
+              while (Date.now() - start < timeout) {
+                const snap = await this._headlessClient.collectClientMetrics();
+
+                if (snap?.entities && snap.entities.count >= minEntities) {
+                  this._log(`[bench]   Got ${snap.entities.count} entities`);
+                  break;
+                }
+
+                await new Promise(r => setTimeout(r, 1000));
+              }
+            }
+            break;
+          case 'walk_player':
+            if (this._headlessClient) {
+              const key = (action.options?.key as string) ?? 'w';
+              const dur = action.durationMs ?? 3000;
+
+              this._log(`[bench]   Walking player: key=${key} for ${dur}ms`);
+
+              try {
+                await this._headlessClient.sendMovement(key, dur);
+              } catch {
+                this._log('[bench]   walk_player: input failed (non-fatal)');
+              }
+            }
+            break;
+          case 'set_camera':
+            if (this._headlessClient) {
+              const yaw = action.yaw ?? 0;
+              const pitch = action.pitch ?? -0.3;
+
+              this._log(`[bench]   Setting camera: yaw=${yaw} pitch=${pitch}`);
+
+              try {
+                if (action.position) {
+                  await this._headlessClient.setCameraPosition(action.position.x, action.position.y, action.position.z);
+                }
+
+                await this._headlessClient.lookAt(yaw, pitch);
+                await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+              } catch {
+                this._log('[bench]   set_camera: failed (non-fatal)');
+              }
+            }
+            break;
+          case 'throttle_cpu':
+            if (this._headlessClient) {
+              const rate = action.rate ?? 1;
+
+              this._log(`[bench]   CPU throttle: ${rate}x`);
+
+              try {
+                await this._headlessClient.setCpuThrottle(rate);
+              } catch {
+                this._log('[bench]   throttle_cpu: failed (non-fatal)');
+              }
+            }
+            break;
           case 'custom':
             throw new Error(`Action not supported yet: ${action.type}`);
         }

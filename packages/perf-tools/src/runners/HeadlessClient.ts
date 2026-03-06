@@ -12,6 +12,7 @@ export interface HeadlessClientOptions {
 export default class HeadlessClient {
   private _browser: unknown = null;
   private _page: unknown = null;
+  private _cdp: any = null;
   private _options: HeadlessClientOptions;
   private _performanceEntries: ClientSnapshot[] = [];
   private _connected: boolean = false;
@@ -51,7 +52,7 @@ export default class HeadlessClient {
         '--enable-precise-memory-info',
         '--disable-notifications',
         '--autoplay-policy=no-user-gesture-required',
-        '--use-gl=swiftshader',
+        '--enable-unsafe-swiftshader',
         `--window-size=${this._options.width},${this._options.height}`,
       ],
     });
@@ -82,13 +83,13 @@ export default class HeadlessClient {
       console.log(`[client:error] ${err.message ?? err}`);
     });
 
-    const cdp = await page.createCDPSession();
+    this._cdp = await page.createCDPSession();
 
     // Bypass certificate errors via CDP (--ignore-certificate-errors doesn't work in headless: 'new')
-    await cdp.send('Security.setIgnoreCertificateErrors', { ignore: true });
+    await this._cdp.send('Security.setIgnoreCertificateErrors', { ignore: true });
 
     if (this._options.collectPerformance) {
-      await cdp.send('Performance.enable');
+      await this._cdp.send('Performance.enable');
     }
 
     // Patch fetch() to strip unsupported targetAddressSpace option
@@ -105,6 +106,7 @@ export default class HeadlessClient {
 
         return originalFetch(input, init);
       };
+
     });
   }
 
@@ -219,6 +221,155 @@ export default class HeadlessClient {
       return snapshot;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Send movement input directly via the game's network manager.
+   * Bypasses pointer lock / keyboard events — works in headless mode.
+   * Sends packets continuously at 30Hz to match InputManager behavior.
+   * key: 'w' | 'a' | 's' | 'd' | 'sp' (space/jump)
+   */
+  public async sendMovement(key: string, durationMs: number): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    try {
+      // Send start packet and then continue sending at 30Hz with camera orientation
+      await page.evaluate((k: string, durMs: number) => {
+        const game = (window as any).__HYTOPIA_GAME__;
+
+        if (!game?.networkManager) return;
+
+        // Send initial key-down
+        game.networkManager.sendInputPacket({ [k]: true });
+
+        // Send continuous camera+movement at 30Hz so server knows direction
+        const interval = setInterval(() => {
+          const yaw = game.camera?._gameCameraYaw ?? 0;
+          const pitch = game.camera?._gameCameraPitch ?? 0;
+
+          game.networkManager.sendInputPacket({ cp: pitch, cy: yaw });
+        }, 33);
+
+        // Store cleanup for later
+        (window as any).__HYTOPIA_MOVEMENT_INTERVAL__ = interval;
+        (window as any).__HYTOPIA_MOVEMENT_KEY__ = k;
+
+        // Auto-stop after duration
+        setTimeout(() => {
+          clearInterval(interval);
+          game.networkManager.sendInputPacket({ [k]: false });
+          (window as any).__HYTOPIA_MOVEMENT_INTERVAL__ = null;
+        }, durMs);
+      }, key, durationMs);
+
+      // Wait for the movement to complete
+      await new Promise(r => setTimeout(r, durationMs + 100));
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Simulate mouse look by injecting camera yaw/pitch directly via the game's input system.
+   */
+  public async lookAt(yawRadians: number, pitchRadians: number): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    try {
+      await page.evaluate((yaw: number, pitch: number) => {
+        const game = (window as any).__HYTOPIA_GAME__;
+
+        if (!game) return;
+
+        // Set camera yaw/pitch directly on the Camera object (client-side rendering)
+        if (game.camera) {
+          game.camera._gameCameraYaw = yaw;
+          game.camera._gameCameraPitch = pitch;
+        }
+
+        // Also send to server so movement direction matches camera direction
+        if (game.networkManager) {
+          game.networkManager.sendInputPacket({ cp: pitch, cy: yaw });
+        }
+      }, yawRadians, pitchRadians);
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Teleport the camera/player to a specific world position.
+   * Works by directly setting the camera target position.
+   */
+  public async setCameraPosition(x: number, y: number, z: number): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    try {
+      await page.evaluate((px: number, py: number, pz: number) => {
+        const game = (window as any).__HYTOPIA_GAME__;
+
+        if (game?.camera) {
+          game.camera.setTarget(px, py, pz);
+        }
+      }, x, y, z);
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Simulate a player walking forward for a duration, with optional camera rotation.
+   * This makes the headless client behave like a real player walking around.
+   */
+  public async simulateWalkSequence(steps: Array<{ durationMs: number; key?: string; yaw?: number; pitch?: number }>): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    // Click to get pointer lock
+    try {
+      await page.mouse.click(640, 360);
+      await new Promise(r => setTimeout(r, 300));
+    } catch {
+      // continue
+    }
+
+    for (const step of steps) {
+      try {
+        // Set camera direction if specified
+        if (step.yaw !== undefined || step.pitch !== undefined) {
+          await this.lookAt(step.yaw ?? 0, step.pitch ?? -0.3);
+        }
+
+        // Press movement key
+        const key = step.key ?? 'w';
+
+        await page.keyboard.down(key);
+        await new Promise(r => setTimeout(r, step.durationMs));
+        await page.keyboard.up(key);
+      } catch {
+        // continue sequence
+      }
+    }
+  }
+
+  /**
+   * Throttle CPU execution speed via CDP. rate=1 means no throttle, rate=4 means 4x slower (simulates mobile).
+   */
+  public async setCpuThrottle(rate: number): Promise<void> {
+    if (!this._cdp) return;
+
+    try {
+      await this._cdp.send('Emulation.setCPUThrottlingRate', { rate: Math.max(1, rate) });
+    } catch {
+      // best-effort
     }
   }
 

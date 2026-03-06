@@ -20,6 +20,9 @@ export default class PerfBridge {
     };
 
     (window as any).__HYTOPIA_PERF__ = perf;
+
+    // Expose game instance for headless client control (camera, input)
+    (window as any).__HYTOPIA_GAME__ = game;
   }
 
   private _snapshot() {
