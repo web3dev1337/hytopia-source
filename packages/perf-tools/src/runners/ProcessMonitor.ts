@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 export interface ProcessSnapshot {
   timestamp: number;
@@ -29,7 +28,7 @@ export default class ProcessMonitor {
   private _pid: number = 0;
   private _interval: ReturnType<typeof setInterval> | null = null;
   private _snapshots: ProcessSnapshot[] = [];
-  private _lastSample: ProcStatSample | null = null;
+  private _lastSamples: Map<number, ProcStatSample> = new Map();
   private _clockTick: number;
 
   constructor() {
@@ -39,9 +38,9 @@ export default class ProcessMonitor {
   public start(pid: number, intervalMs: number = 1000): void {
     this._pid = pid;
     this._snapshots = [];
-    this._lastSample = null;
+    this._lastSamples.clear();
 
-    this._takeSample(); // prime the CPU delta baseline
+    this._primeBaseline(); // prime the CPU delta baseline
 
     this._interval = setInterval(() => {
       try {
@@ -70,34 +69,87 @@ export default class ProcessMonitor {
     return this._summarize();
   }
 
-  private _collect(): ProcessSnapshot | null {
-    const stat = this._takeSample();
-    if (!stat || !this._lastSample) return null;
-
-    const cpuPct = this._calcCpuPct(this._lastSample, stat);
-    const rssMb = this._readRssMb();
-    const threads = this._readThreads();
-    const fds = this._countFds();
-
-    this._lastSample = stat;
-
-    return { timestamp: Date.now(), cpuPct, rssMb, threads, fds };
+  /** Discover all PIDs in the process group (leader + children). */
+  private _getGroupPids(): number[] {
+    const pids: number[] = [];
+    try {
+      const entries = fs.readdirSync('/proc');
+      for (const entry of entries) {
+        const pid = parseInt(entry, 10);
+        if (isNaN(pid)) continue;
+        try {
+          const raw = fs.readFileSync(`/proc/${pid}/stat`, 'utf-8');
+          const closeParen = raw.lastIndexOf(')');
+          const fields = raw.slice(closeParen + 2).split(' ');
+          const pgid = parseInt(fields[2], 10); // pgrp is field index 4 in stat (0-based after comm)
+          if (pgid === this._pid) pids.push(pid);
+        } catch {
+          // process vanished
+        }
+      }
+    } catch {
+      // fallback to just the leader
+      pids.push(this._pid);
+    }
+    if (pids.length === 0) pids.push(this._pid);
+    return pids;
   }
 
-  private _takeSample(): ProcStatSample | null {
+  private _primeBaseline(): void {
+    const pids = this._getGroupPids();
+    for (const pid of pids) {
+      const sample = this._readProcStat(pid);
+      if (sample) this._lastSamples.set(pid, sample);
+    }
+  }
+
+  private _collect(): ProcessSnapshot | null {
+    const pids = this._getGroupPids();
+    let totalCpuPct = 0;
+    let totalRssKb = 0;
+    let totalThreads = 0;
+    let totalFds = 0;
+
+    for (const pid of pids) {
+      const curSample = this._readProcStat(pid);
+      if (!curSample) continue;
+
+      const prevSample = this._lastSamples.get(pid);
+      if (prevSample) {
+        totalCpuPct += this._calcCpuPct(prevSample, curSample);
+      }
+      this._lastSamples.set(pid, curSample);
+
+      totalRssKb += this._readRssKb(pid);
+      totalThreads += this._readThreadCount(pid);
+      totalFds += this._countFds(pid);
+    }
+
+    // prune stale PIDs
+    for (const pid of this._lastSamples.keys()) {
+      if (!pids.includes(pid)) this._lastSamples.delete(pid);
+    }
+
+    if (pids.length === 0) return null;
+
+    return {
+      timestamp: Date.now(),
+      cpuPct: totalCpuPct,
+      rssMb: totalRssKb / 1024,
+      threads: totalThreads,
+      fds: totalFds,
+    };
+  }
+
+  private _readProcStat(pid: number): ProcStatSample | null {
     try {
-      const raw = fs.readFileSync(`/proc/${this._pid}/stat`, 'utf-8');
-      // fields: pid (comm) state ppid ... utime(14) stime(15)
-      // comm can contain spaces/parens, so find the closing ')' first
+      const raw = fs.readFileSync(`/proc/${pid}/stat`, 'utf-8');
       const closeParen = raw.lastIndexOf(')');
       const fields = raw.slice(closeParen + 2).split(' ');
-      // fields[0] = state, fields[11] = utime (index 13 in full, but 11 after state)
+      // fields[11] = utime, fields[12] = stime (after state, which is fields[0])
       const utime = parseInt(fields[11], 10);
       const stime = parseInt(fields[12], 10);
-
-      const sample: ProcStatSample = { utime, stime, wallMs: Date.now() };
-      if (!this._lastSample) this._lastSample = sample;
-      return sample;
+      return { utime, stime, wallMs: Date.now() };
     } catch {
       return null;
     }
@@ -113,19 +165,19 @@ export default class ProcessMonitor {
     return (cpuDeltaS / wallDeltaS) * 100;
   }
 
-  private _readRssMb(): number {
+  private _readRssKb(pid: number): number {
     try {
-      const raw = fs.readFileSync(`/proc/${this._pid}/status`, 'utf-8');
+      const raw = fs.readFileSync(`/proc/${pid}/status`, 'utf-8');
       const match = raw.match(/VmRSS:\s+(\d+)\s+kB/);
-      return match ? parseInt(match[1], 10) / 1024 : 0;
+      return match ? parseInt(match[1], 10) : 0;
     } catch {
       return 0;
     }
   }
 
-  private _readThreads(): number {
+  private _readThreadCount(pid: number): number {
     try {
-      const raw = fs.readFileSync(`/proc/${this._pid}/status`, 'utf-8');
+      const raw = fs.readFileSync(`/proc/${pid}/status`, 'utf-8');
       const match = raw.match(/Threads:\s+(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
     } catch {
@@ -133,9 +185,9 @@ export default class ProcessMonitor {
     }
   }
 
-  private _countFds(): number {
+  private _countFds(pid: number): number {
     try {
-      return fs.readdirSync(`/proc/${this._pid}/fd`).length;
+      return fs.readdirSync(`/proc/${pid}/fd`).length;
     } catch {
       return 0;
     }
