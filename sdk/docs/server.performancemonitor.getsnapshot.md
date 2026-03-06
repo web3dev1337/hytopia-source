@@ -7,8 +7,44 @@
 **Signature:**
 
 ```typescript
-getSnapshot(): PerformanceSnapshot;
+getSnapshot(worldId?: number): PerformanceSnapshot;
 ```
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+worldId
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
 **Returns:**
 
 [PerformanceSnapshot](./server.performancesnapshot.md)

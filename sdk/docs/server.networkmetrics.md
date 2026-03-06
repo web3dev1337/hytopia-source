@@ -203,6 +203,18 @@ Description
 </td></tr>
 <tr><td>
 
+[reset()](./server.networkmetrics.reset.md)
+
+
+</td><td>
+
+
+</td><td>
+
+
+</td></tr>
+<tr><td>
+
 [setConnectedPlayers(count)](./server.networkmetrics.setconnectedplayers.md)
 
 

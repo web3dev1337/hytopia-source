@@ -12,6 +12,10 @@ import type { Socket } from 'net';
 import { WebSocket as WebSocket_2 } from 'ws';
 import type { WebTransportSessionImpl } from '@fails-components/webtransport/dist/lib/types';
 
+declare type AnyConstructor = abstract new (...args: unknown[]) => unknown;
+
+export declare type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
+
 /**
  * Manages the assets library and synchronization of assets
  * to the local assets directory in development.
@@ -1811,6 +1815,12 @@ export declare class Chunk implements protocol.Serializable {
 
 }
 
+declare interface ChunkCacheChunk {
+    originCoordinate: Vector3Like;
+    blocks: Uint8Array;
+    blockRotations: Map<number, BlockRotation>;
+}
+
 /**
  * A lattice of chunks that represent a world's terrain.
  *
@@ -2649,6 +2659,43 @@ export declare class CollisionGroupsBuilder {
  */
 export declare type CommandCallback = (player: Player, args: string[], message: string) => void;
 
+export declare interface CompressedWorldMap {
+    format?: 'hytopia.worldmap.compressed';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: CompressedWorldMapAlgorithm;
+    data: string;
+    bounds: CompressedWorldMapBounds;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+    options?: CompressedWorldMapOptions;
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare type CompressedWorldMapAlgorithm = 'brotli' | 'gzip' | 'none';
+
+declare interface CompressedWorldMapBounds {
+    minX: number;
+    minY: number;
+    minZ: number;
+    maxX: number;
+    maxY: number;
+    maxZ: number;
+}
+
+declare interface CompressedWorldMapOptions {
+    rotations?: boolean;
+    useDelta?: boolean;
+    useVarint?: boolean;
+}
+
+export declare interface CompressWorldMapOptions {
+    algorithm?: CompressedWorldMapAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+}
+
 /**
  * The options for a cone collider. @public
  *
@@ -2710,6 +2757,13 @@ export declare type ContactManifold = {
 export declare class CpuProfiler {
     static captureProfile(durationMs: number, outputPath?: string): Promise<object | null>;
     static captureHeapSnapshot(outputPath?: string): Promise<string>;
+}
+
+export declare interface CreateWorldMapChunkCacheOptions {
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+    sourceSha256?: string;
 }
 
 /**
@@ -6212,15 +6266,13 @@ export declare type ModelTrimesh = {
     indices: Uint32Array;
 };
 
-export declare function Monitor(operationName?: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => PropertyDescriptor;
+export declare function Monitor(operationName?: string): MethodDecorator;
 
 export declare function monitorAsyncBlock<T>(name: string, fn: () => Promise<T>): Promise<T>;
 
 export declare function monitorBlock<T>(name: string, fn: () => T): T;
 
-export declare function MonitorClass(prefix?: string): <T extends {
-    new (...args: any[]): {};
-}>(constructor: T) => T;
+export declare function MonitorClass(prefix?: string): <TConstructor extends AnyConstructor>(constructor: TConstructor) => TConstructor;
 
 /**
  * Callback invoked as the entity moves toward a target coordinate.
@@ -6291,6 +6343,7 @@ export declare class NetworkMetrics {
     get isEnabled(): boolean;
     enable(): void;
     disable(): void;
+    reset(): void;
     setConnectedPlayers(count: number): void;
     recordBytesSent(bytes: number): void;
     recordBytesReceived(bytes: number): void;
@@ -7348,19 +7401,10 @@ export declare class PerformanceMonitor extends EventRouter {
     private _spikeThresholdMs;
     private _tickBudgetMs;
     private _snapshotIntervalMs;
+    private _historySize;
     private _startTime;
     private _operations;
-    private _tickDurations;
-    private _tickIndex;
-    private _tickCount;
-    private _ticksOverBudget;
-    private _maxTickMs;
-    private _totalTicks;
-    private _currentTick;
-    private _currentTickStart;
-    private _currentPhases;
-    private _currentEntityCount;
-    private _currentPlayerCount;
+    private _worldTicks;
     private _entityCosts;
     private _snapshotTimer;
     private constructor();
@@ -7372,18 +7416,22 @@ export declare class PerformanceMonitor extends EventRouter {
     measure<T>(name: string, fn: () => T): T;
     measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T>;
     startTiming(name: string): () => void;
-    beginTick(tick: number, entityCount: number, playerCount: number): void;
-    recordPhase(phaseName: string, durationMs: number): void;
-    endTick(): void;
+    beginTick(tick: number, entityCount: number, playerCount: number, worldId?: number): void;
+    recordPhase(phaseName: string, durationMs: number, worldId?: number): void;
+    endTick(worldId?: number): void;
     recordEntityCost(entityId: number, name: string, tickMs: number): void;
     getEntityCosts(): Map<number, {
         tickMs: number;
         name: string;
     }>;
-    getSnapshot(): PerformanceSnapshot;
+    getSnapshot(worldId?: number): PerformanceSnapshot;
     resetStats(): void;
     private _recordOperation;
+    private _getOrCreateWorldTickState;
     private _getTickSamples;
+    private _getAllTickSamples;
+    private _getRollup;
+    private _getGlobalRollup;
     private _getOperationStats;
 }
 
@@ -10753,6 +10801,7 @@ export declare type TelemetrySpanOptions = {
 };
 
 export declare interface TickReport {
+    worldId: number;
     tick: number;
     durationMs: number;
     budgetMs: number;
@@ -11614,13 +11663,18 @@ export declare class World extends EventRouter implements protocol.Serializable 
      * - Registers block types from the map into `World.blockTypeRegistry`.
      * - Spawns map entities as `isEnvironmental: true` by default.
      *
-     * @param map - The map to load.
+     * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+     *   WorldMapChunkCache) or a string file path. When a string is provided,
+     *   WorldMapFileLoader auto-detects the best available format.
      *
      * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
      *
      * **Category:** Core
      */
-    loadMap(map: WorldMap): void;
+    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
+        spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
+    }): void;
     /**
      * Sets the color of the world's ambient light.
      *
@@ -12123,6 +12177,83 @@ export declare interface WorldMap {
     };
 }
 
+export declare type WorldMapArtifacts = {
+    compressedMap: CompressedWorldMap;
+    compressedMapJson: string;
+    compressedMapSha256: string;
+    chunkCache: WorldMapChunkCache;
+    chunkCacheBuffer: Buffer;
+};
+
+export declare class WorldMapArtifactsGenerator {
+    static create(worldMap: WorldMap, options?: {
+        compressed?: CompressWorldMapOptions;
+        chunkCache?: Omit<CreateWorldMapChunkCacheOptions, 'sourceSha256'>;
+    }): WorldMapArtifacts;
+}
+
+export declare interface WorldMapChunkCache {
+    format?: 'hytopia.worldmap.chunk-cache';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    data: string;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+}
+
+export declare type WorldMapChunkCacheAlgorithm = 'brotli' | 'gzip' | 'none';
+
+export declare class WorldMapChunkCacheCodec {
+    private static _writeHeader;
+    static isWorldMapChunkCache(value: unknown): value is WorldMapChunkCache;
+    static create(map: WorldMap | CompressedWorldMap, options?: CreateWorldMapChunkCacheOptions): WorldMapChunkCache;
+    static decode(cache: WorldMapChunkCache): {
+        metadata: WorldMapChunkCacheMetadata;
+        chunks: Iterable<ChunkCacheChunk>;
+    };
+    static decodeMetadata(cache: WorldMapChunkCache): WorldMapChunkCacheMetadata;
+    static decodeChunks(cache: WorldMapChunkCache): Iterable<ChunkCacheChunk>;
+    static decompressToWorldMap(cache: WorldMapChunkCache): WorldMap;
+    private static _decodeFile;
+    private static _decodeMetadata;
+    private static _decodeChunks;
+    private static _encodeBody;
+}
+
+export declare interface WorldMapChunkCacheMetadata {
+    blockTypes?: BlockTypeOptions[];
+    entities?: WorldMap['entities'];
+    options?: WorldMapChunkCacheOptions;
+    source?: {
+        sha256?: string;
+    };
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare interface WorldMapChunkCacheOptions {
+    rotations?: boolean;
+}
+
+export declare class WorldMapCodec {
+    static isCompressedWorldMap(value: unknown): value is CompressedWorldMap;
+    static compress(map: WorldMap, options?: CompressWorldMapOptions): CompressedWorldMap;
+    static decodeBlockEntries(map: CompressedWorldMap): Iterable<{
+        globalCoordinate: Vector3Like;
+        blockTypeId: number;
+        blockRotation?: BlockRotation;
+    }>;
+    static decompressToWorldMap(map: CompressedWorldMap): WorldMap;
+}
+
+export declare class WorldMapFileLoader {
+    static load(mapPath: string, options?: {
+        preferChunkCache?: boolean;
+        warnings?: 'auto' | 'always' | 'never';
+    }): AnyWorldMap;
+}
+
 /**
  * Options for creating a World instance.
  *
@@ -12156,7 +12287,7 @@ export declare interface WorldOptions {
     /** The minimum distance from the camera to start applying fog. */
     fogNear?: number;
     /** The map of the world. */
-    map?: WorldMap;
+    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
     /** The name of the world. */
     name: string;
     /** The intensity of the skybox brightness for the world. 0 is black, 1 is full brightness, 1+ is brighter. */

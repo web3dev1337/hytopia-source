@@ -7,9 +7,7 @@
 **Signature:**
 
 ```typescript
-export declare function MonitorClass(prefix?: string): <T extends {
-    new (...args: any[]): {};
-}>(constructor: T) => T;
+export declare function MonitorClass(prefix?: string): <TConstructor extends AnyConstructor>(constructor: TConstructor) => TConstructor;
 ```
 
 ## Parameters
@@ -49,5 +47,5 @@ _(Optional)_
 </tbody></table>
 **Returns:**
 
-&lt;T extends { new (...args: any\[\]): {}; }&gt;(constructor: T) =&gt; T
+&lt;TConstructor extends AnyConstructor&gt;(constructor: TConstructor) =&gt; TConstructor
 

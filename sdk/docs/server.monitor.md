@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-export declare function Monitor(operationName?: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => PropertyDescriptor;
+export declare function Monitor(operationName?: string): MethodDecorator;
 ```
 
 ## Parameters
@@ -47,5 +47,5 @@ _(Optional)_
 </tbody></table>
 **Returns:**
 
-(target: any, propertyKey: string, descriptor: PropertyDescriptor) =&gt; PropertyDescriptor
+MethodDecorator
 

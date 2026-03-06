@@ -115,7 +115,7 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
-[beginTick(tick, entityCount, playerCount)](./server.performancemonitor.begintick.md)
+[beginTick(tick, entityCount, playerCount, worldId)](./server.performancemonitor.begintick.md)
 
 
 </td><td>
@@ -163,7 +163,7 @@ Description
 </td></tr>
 <tr><td>
 
-[endTick()](./server.performancemonitor.endtick.md)
+[endTick(worldId)](./server.performancemonitor.endtick.md)
 
 
 </td><td>
@@ -187,7 +187,7 @@ Description
 </td></tr>
 <tr><td>
 
-[getSnapshot()](./server.performancemonitor.getsnapshot.md)
+[getSnapshot(worldId)](./server.performancemonitor.getsnapshot.md)
 
 
 </td><td>
@@ -235,7 +235,7 @@ Description
 </td></tr>
 <tr><td>
 
-[recordPhase(phaseName, durationMs)](./server.performancemonitor.recordphase.md)
+[recordPhase(phaseName, durationMs, worldId)](./server.performancemonitor.recordphase.md)
 
 
 </td><td>

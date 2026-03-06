@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-03-06T01:56:48.515Z",
+  "scenario": "zoo-game-18-bots",
+  "durationMs": 128451,
+  "baseline": {
+    "avgTickMs": 0,
+    "maxTickMs": 0,
+    "p95TickMs": 0,
+    "p99TickMs": 0,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 0,
+    "operations": {}
+  },
+  "phases": [
+    {
+      "name": "gameplay",
+      "durationMs": 108389,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 0,
+    "clientSnapshotCount": 0
+  }
+}

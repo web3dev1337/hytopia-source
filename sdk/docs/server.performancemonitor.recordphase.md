@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-recordPhase(phaseName: string, durationMs: number): void;
+recordPhase(phaseName: string, durationMs: number, worldId?: number): void;
 ```
 
 ## Parameters
@@ -53,6 +53,22 @@ number
 
 
 </td><td>
+
+
+</td></tr>
+<tr><td>
+
+worldId
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
 
 
 </td></tr>

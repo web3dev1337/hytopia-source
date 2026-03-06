@@ -7,7 +7,7 @@
 **Signature:**
 
 ```typescript
-beginTick(tick: number, entityCount: number, playerCount: number): void;
+beginTick(tick: number, entityCount: number, playerCount: number, worldId?: number): void;
 ```
 
 ## Parameters
@@ -67,6 +67,22 @@ number
 
 
 </td><td>
+
+
+</td></tr>
+<tr><td>
+
+worldId
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
 
 
 </td></tr>

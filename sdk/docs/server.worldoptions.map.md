@@ -9,5 +9,5 @@ The map of the world.
 **Signature:**
 
 ```typescript
-map?: WorldMap;
+map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
 ```
