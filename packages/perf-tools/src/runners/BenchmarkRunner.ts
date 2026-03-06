@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import MetricCollector, { type CollectedMetrics } from './MetricCollector.js';
+import ProcessMonitor, { type ProcessMetrics } from './ProcessMonitor.js';
 import ServerApiClient from './ServerApiClient.js';
 import WsClient from './WsClient.js';
 import { type Scenario, type ScenarioPhase, parseDuration } from './ScenarioLoader.js';
@@ -14,12 +15,15 @@ export interface BenchmarkRunnerOptions {
   clientUrl?: string;
   headless?: boolean;
   verbose?: boolean;
+  noPerfApi?: boolean;
+  logFile?: string;
 }
 
 export interface BenchmarkResult {
   scenario: Scenario;
   metrics: CollectedMetrics;
   baseline: BaselineResult;
+  processMetrics?: ProcessMetrics;
   durationMs: number;
   phaseResults: PhaseResult[];
 }
@@ -33,9 +37,12 @@ export interface PhaseResult {
 export default class BenchmarkRunner {
   private _options: Required<BenchmarkRunnerOptions>;
   private _collector: MetricCollector;
+  private _processMonitor: ProcessMonitor;
   private _serverProcess: ChildProcess | null = null;
   private _serverApi: ServerApiClient;
   private _wsClients: WsClient[] = [];
+  private _perfApiAvailable: boolean = true;
+  private _logStream: fs.WriteStream | null = null;
   private _log: (msg: string) => void;
 
   constructor(options?: BenchmarkRunnerOptions) {
@@ -45,9 +52,13 @@ export default class BenchmarkRunner {
       clientUrl: options?.clientUrl ?? 'https://local.hytopiahosting.com:8080',
       headless: options?.headless ?? true,
       verbose: options?.verbose ?? false,
+      noPerfApi: options?.noPerfApi ?? false,
+      logFile: options?.logFile ?? '',
     };
     this._collector = new MetricCollector();
+    this._processMonitor = new ProcessMonitor();
     this._serverApi = new ServerApiClient(this._options.clientUrl);
+    this._perfApiAvailable = !this._options.noPerfApi;
     this._log = this._options.verbose ? console.log : () => {};
   }
 
@@ -57,9 +68,26 @@ export default class BenchmarkRunner {
 
     this._log(`[bench] Starting scenario: ${scenario.name}`);
 
+    let processMetrics: ProcessMetrics | undefined;
+
     try {
       await this._startServer();
+
+      // start process monitor as soon as server PID is available
+      if (this._serverProcess?.pid) {
+        this._log(`[bench] Starting process monitor (pid=${this._serverProcess.pid})`);
+        this._processMonitor.start(this._serverProcess.pid);
+      }
+
       await this._serverApi.waitForHealthy();
+
+      // probe PerfHarness availability unless explicitly disabled
+      if (this._perfApiAvailable) {
+        this._perfApiAvailable = await this._probePerfApi();
+        if (!this._perfApiAvailable) {
+          this._log('[bench] PerfHarness API unavailable — using OS-level monitoring only');
+        }
+      }
 
       if (scenario.clients && scenario.clients > 0) {
         await this._launchWsClients(scenario.clients);
@@ -76,6 +104,7 @@ export default class BenchmarkRunner {
         phaseResults.push(phaseResult);
       }
     } finally {
+      processMetrics = this._processMonitor.stop();
       await this._cleanup();
     }
 
@@ -86,6 +115,7 @@ export default class BenchmarkRunner {
       scenario,
       metrics,
       baseline,
+      processMetrics,
       durationMs: Date.now() - startTime,
       phaseResults,
     };
@@ -97,7 +127,14 @@ export default class BenchmarkRunner {
     this._log(`[bench] Phase: ${phase.name}`);
 
     if (phase.collect) {
-      await this._serverApi.reset();
+      if (this._perfApiAvailable) {
+        try {
+          await this._serverApi.reset();
+        } catch {
+          this._log('[bench] PerfHarness reset failed — continuing without it');
+          this._perfApiAvailable = false;
+        }
+      }
       this._collector.startCollecting();
     }
 
@@ -232,8 +269,15 @@ export default class BenchmarkRunner {
 
       await this._wait(remaining);
 
-      const snapshot = await this._serverApi.snapshot();
-      this._collector.addServerSnapshot(snapshot);
+      if (this._perfApiAvailable) {
+        try {
+          const snapshot = await this._serverApi.snapshot();
+          this._collector.addServerSnapshot(snapshot);
+        } catch {
+          this._log('[bench] PerfHarness snapshot failed — falling back to OS-only');
+          this._perfApiAvailable = false;
+        }
+      }
     }
   }
 
@@ -250,6 +294,14 @@ export default class BenchmarkRunner {
     this._log(`[bench] Starting server (cwd=${this._options.serverCwd}): ${this._options.serverCommand}`);
     this._log(`[bench] Using server URL: ${this._options.clientUrl}`);
 
+    const useLogFile = this._options.logFile && !this._options.verbose;
+
+    if (useLogFile) {
+      const logDir = path.dirname(this._options.logFile);
+      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+      this._logStream = fs.createWriteStream(this._options.logFile, { flags: 'w' });
+    }
+
     this._serverProcess = spawn(this._options.serverCommand, {
       cwd: this._options.serverCwd,
       shell: true,
@@ -262,6 +314,14 @@ export default class BenchmarkRunner {
         PORT: String(port),
       },
     });
+
+    if (this._logStream && this._serverProcess.stdout) {
+      this._serverProcess.stdout.pipe(this._logStream);
+    }
+
+    if (this._logStream && this._serverProcess.stderr) {
+      this._serverProcess.stderr.pipe(this._logStream);
+    }
   }
 
   private async _launchWsClients(count: number, staggerMs?: number): Promise<void> {
@@ -321,6 +381,15 @@ export default class BenchmarkRunner {
     }
   }
 
+  private async _probePerfApi(): Promise<boolean> {
+    try {
+      await this._serverApi.snapshot();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async _cleanup(): Promise<void> {
     for (const client of this._wsClients) {
       await client.close();
@@ -342,6 +411,11 @@ export default class BenchmarkRunner {
       }
 
       this._serverProcess = null;
+    }
+
+    if (this._logStream) {
+      this._logStream.end();
+      this._logStream = null;
     }
   }
 

@@ -1,8 +1,17 @@
+export interface ProcessSnapshotEntry {
+  timestamp: number;
+  cpuPct: number;
+  rssMb: number;
+  threads: number;
+  fds: number;
+}
+
 export interface CollectedMetrics {
   serverSnapshots: ServerSnapshot[];
   clientSnapshots: ClientSnapshot[];
   tickReports: TickReportEntry[];
   spikes: SpikeEntry[];
+  processSnapshots: ProcessSnapshotEntry[];
   startTime: number;
   endTime: number;
 }
@@ -71,6 +80,7 @@ export default class MetricCollector {
   private _clientSnapshots: ClientSnapshot[] = [];
   private _tickReports: TickReportEntry[] = [];
   private _spikes: SpikeEntry[] = [];
+  private _processSnapshots: ProcessSnapshotEntry[] = [];
   private _startTime: number = 0;
   private _collecting: boolean = false;
 
@@ -81,6 +91,7 @@ export default class MetricCollector {
     this._clientSnapshots = [];
     this._tickReports = [];
     this._spikes = [];
+    this._processSnapshots = [];
   }
 
   public stopCollecting(): CollectedMetrics {
@@ -91,6 +102,7 @@ export default class MetricCollector {
       clientSnapshots: this._clientSnapshots,
       tickReports: this._tickReports,
       spikes: this._spikes,
+      processSnapshots: this._processSnapshots,
       startTime: this._startTime,
       endTime: Date.now(),
     };
@@ -122,5 +134,11 @@ export default class MetricCollector {
     if (!this._collecting) return;
 
     this._spikes.push(spike);
+  }
+
+  public addProcessSnapshot(snapshot: ProcessSnapshotEntry): void {
+    if (!this._collecting) return;
+
+    this._processSnapshots.push(snapshot);
   }
 }

@@ -1,0 +1,13 @@
+name: "hyfire2-5v5-bots"
+description: "HyFire2 5v5 bot match — full combat AI, pathfinding, weapons, economy"
+warmupMs: 15000
+phases:
+  - name: gameplay
+    collect: true
+    duration: 120s
+thresholds:
+  tick_duration_ms:
+    avg: 10
+    p99: 25
+  memory_mb:
+    max: 500

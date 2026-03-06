@@ -1,0 +1,13 @@
+name: "zoo-game-18-bots"
+description: "Zoo Game with 18 bots across 3 worlds, plots unlocked, animals placed"
+warmupMs: 20000
+phases:
+  - name: gameplay
+    collect: true
+    duration: 120s
+thresholds:
+  tick_duration_ms:
+    avg: 12
+    p99: 30
+  memory_mb:
+    max: 1500

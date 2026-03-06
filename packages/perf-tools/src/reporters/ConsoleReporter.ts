@@ -20,6 +20,16 @@ export default class ConsoleReporter {
 
     console.log(`Memory: ${b.avgMemoryMb.toFixed(1)}MB avg heap`);
 
+    if (result.processMetrics && result.processMetrics.snapshots.length > 0) {
+      const pm = result.processMetrics;
+      console.log('');
+      console.log('Process Metrics (OS-level):');
+      console.log(`  CPU: avg=${pm.avgCpuPct.toFixed(1)}% max=${pm.maxCpuPct.toFixed(1)}%${pm.maxCpuPct > 90 ? ' FAIL' : pm.maxCpuPct > 70 ? ' WARN' : ''}`);
+      console.log(`  RSS: avg=${pm.avgRssMb.toFixed(1)}MB max=${pm.maxRssMb.toFixed(1)}MB`);
+      console.log(`  Threads: max=${pm.maxThreads}`);
+      console.log(`  FDs: max=${pm.maxFds}`);
+    }
+
     if (b.avgFps !== undefined) {
       console.log(`Client FPS: ${b.avgFps.toFixed(1)} avg`);
     }

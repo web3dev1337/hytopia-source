@@ -23,7 +23,7 @@ program
   .command('run')
   .description('Run a benchmark scenario')
   .argument('[scenario]', 'Path to scenario YAML/JSON file')
-  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world)')
+  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots)')
   .option('--output <path>', 'Write results to JSON file')
   .option('--full-data', 'Include raw metric data in output')
   .option('--baseline <path>', 'Compare results against a baseline JSON')
@@ -31,6 +31,8 @@ program
   .option('--server-cwd <path>', 'Working directory for server')
   .option('--client-url <url>', 'Server base URL (used for health + perf endpoints)', 'https://local.hytopiahosting.com:8080')
   .option('--no-headless', 'Run browser in visible mode')
+  .option('--no-perf-api', 'Skip PerfHarness API, use only OS-level monitoring')
+  .option('--log-file <path>', 'Capture server stdout/stderr to file')
   .option('--verbose', 'Enable verbose logging')
   .action(async (scenarioPath, options) => {
     let scenario;
@@ -39,7 +41,7 @@ program
       const presetPath = path.join(__dirname, 'presets', `${options.preset}.yaml`);
 
       if (!fs.existsSync(presetPath)) {
-        console.error('Unknown preset: %s. Available: idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world', options.preset);
+        console.error('Unknown preset: %s. Available: idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots', options.preset);
         process.exit(1);
       }
 
@@ -57,6 +59,8 @@ program
       clientUrl: options.clientUrl,
       headless: options.headless !== false,
       verbose: options.verbose,
+      noPerfApi: options.perfApi === false,
+      logFile: options.logFile,
     });
 
     console.log(`Running benchmark: ${scenario.name}`);
