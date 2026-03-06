@@ -373,6 +373,28 @@ export default class HeadlessClient {
     }
   }
 
+  /**
+   * Send a chat message via the game's network manager.
+   * Used to trigger server-side debug commands like /fillzoo.
+   */
+  public async sendChatMessage(message: string): Promise<void> {
+    const page = this._page as any;
+
+    if (!page || !this._connected) return;
+
+    try {
+      await page.evaluate((msg: string) => {
+        const game = (window as any).__HYTOPIA_GAME__;
+
+        if (game?.networkManager?.sendChatMessagePacket) {
+          game.networkManager.sendChatMessagePacket(msg);
+        }
+      }, message);
+    } catch {
+      // best-effort
+    }
+  }
+
   public async captureTrace(durationMs: number): Promise<object | null> {
     const page = this._page as any;
 

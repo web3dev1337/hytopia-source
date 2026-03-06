@@ -27,6 +27,7 @@ export interface ScenarioAction {
     | 'wait_for_entities'
     | 'set_camera'
     | 'throttle_cpu'
+    | 'send_chat'
     | 'custom';
   count?: number;
   behavior?: string;
@@ -36,6 +37,7 @@ export interface ScenarioAction {
   yaw?: number;
   pitch?: number;
   rate?: number;
+  message?: string;
   worldId?: number;
   kind?: 'model' | 'block';
   tag?: string;

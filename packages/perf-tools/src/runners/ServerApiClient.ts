@@ -1,3 +1,5 @@
+import * as http from 'node:http';
+import * as https from 'node:https';
 import type { ServerSnapshot } from './MetricCollector.js';
 
 interface HealthResponse {
@@ -86,30 +88,30 @@ export default class ServerApiClient {
 
   public async health(): Promise<HealthResponse> {
     const url = new URL('/', this._baseUrl);
-    const res = await fetch(url, { method: 'GET' });
+    const res = await this._request(url, { method: 'GET' });
 
-    if (!res.ok) {
-      throw new Error(`Health check failed: ${res.status} ${res.statusText}`);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Health check failed: ${res.statusCode} ${res.statusMessage}`);
     }
 
-    return await res.json() as HealthResponse;
+    return JSON.parse(res.body) as HealthResponse;
   }
 
   public async reset(): Promise<void> {
     const url = new URL('/__perf/reset', this._baseUrl);
-    const res = await fetch(url, {
+    const res = await this._request(url, {
       method: 'POST',
       headers: this._headers(),
     });
 
-    if (!res.ok) {
-      throw new Error(`Reset failed: ${res.status} ${res.statusText}`);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Reset failed: ${res.statusCode} ${res.statusMessage}`);
     }
   }
 
   public async action(action: ServerAction): Promise<void> {
     const url = new URL('/__perf/action', this._baseUrl);
-    const res = await fetch(url, {
+    const res = await this._request(url, {
       method: 'POST',
       headers: {
         ...this._headers(),
@@ -118,21 +120,20 @@ export default class ServerApiClient {
       body: JSON.stringify(action),
     });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Action failed: ${res.status} ${res.statusText}${text ? ` - ${text}` : ''}`);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Action failed: ${res.statusCode} ${res.statusMessage}${res.body ? ` - ${res.body}` : ''}`);
     }
   }
 
   public async snapshot(): Promise<ServerSnapshot> {
     const url = new URL('/__perf/snapshot', this._baseUrl);
-    const res = await fetch(url, { method: 'GET', headers: this._headers() });
+    const res = await this._request(url, { method: 'GET', headers: this._headers() });
 
-    if (!res.ok) {
-      throw new Error(`Snapshot failed: ${res.status} ${res.statusText}`);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Snapshot failed: ${res.statusCode} ${res.statusMessage}`);
     }
 
-    const data = await res.json() as PerfSnapshotResponse;
+    const data = JSON.parse(res.body) as PerfSnapshotResponse;
 
     return {
       timestamp: data.timestamp,
@@ -155,5 +156,52 @@ export default class ServerApiClient {
     return {
       'x-hytopia-perf-token': this._token,
     };
+  }
+
+  private async _request(
+    url: URL,
+    options: { method: string; headers?: Record<string, string>; body?: string },
+  ): Promise<{ statusCode: number; statusMessage: string; body: string }> {
+    const transport = url.protocol === 'https:' ? https : http;
+
+    return await new Promise((resolve, reject) => {
+      const req = transport.request(url, {
+        method: options.method,
+        headers: options.headers,
+        rejectUnauthorized: !this._shouldAllowInsecureTls(url),
+      }, res => {
+        const chunks: Buffer[] = [];
+
+        res.on('data', chunk => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode ?? 0,
+            statusMessage: res.statusMessage ?? 'Unknown Error',
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      });
+
+      req.on('error', reject);
+
+      if (options.body) {
+        req.write(options.body);
+      }
+
+      req.end();
+    });
+  }
+
+  private _shouldAllowInsecureTls(url: URL): boolean {
+    if (url.protocol !== 'https:') {
+      return false;
+    }
+
+    return url.hostname === 'localhost'
+      || url.hostname === '127.0.0.1'
+      || url.hostname === '::1'
+      || url.hostname === 'local.hytopiahosting.com';
   }
 }

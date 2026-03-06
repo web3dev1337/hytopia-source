@@ -23,7 +23,7 @@ program
   .command('run')
   .description('Run a benchmark scenario')
   .argument('[scenario]', 'Path to scenario YAML/JSON file')
-  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots)')
+  .option('--preset <name>', 'Use a built-in preset (idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots, zoo-game-full)')
   .option('--output <path>', 'Write results to JSON file')
   .option('--full-data', 'Include raw metric data in output')
   .option('--baseline <path>', 'Compare results against a baseline JSON')
@@ -35,6 +35,8 @@ program
   .option('--log-file <path>', 'Capture server stdout/stderr to file')
   .option('--with-client', 'Launch headless browser client and collect client-side metrics')
   .option('--client-dev-url <url>', 'URL for the Vite client dev server', 'http://localhost:5173')
+  .option('--cpu-throttle <rate>', 'Apply browser CPU throttle rate (1=no throttle, 4=mid mobile, 16=low-end)', parseFloat)
+  .option('--external-server <url>', 'Use an already-running external server (skip server startup)')
   .option('--verbose', 'Enable verbose logging')
   .action(async (scenarioPath, options) => {
     let scenario;
@@ -43,7 +45,7 @@ program
       const presetPath = path.join(__dirname, 'presets', `${options.preset}.yaml`);
 
       if (!fs.existsSync(presetPath)) {
-        console.error('Unknown preset: %s. Available: idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots', options.preset);
+        console.error('Unknown preset: %s. Available: idle, stress, large-world, many-players, combined, join-storm, block-churn, entity-density, multi-world, blocks-10k-dense, blocks-500k-dense, blocks-1m-dense, blocks-10m-dense, blocks-1m-multi-world, hyfire2-bots, zoo-game-bots, zoo-game-full', options.preset);
         process.exit(1);
       }
 
@@ -60,11 +62,13 @@ program
       serverCwd: options.serverCwd,
       clientUrl: options.clientUrl,
       clientDevUrl: options.clientDevUrl,
+      cpuThrottle: options.cpuThrottle,
       withClient: options.withClient ?? false,
       headless: options.headless !== false,
       verbose: options.verbose,
       noPerfApi: options.perfApi === false,
       logFile: options.logFile,
+      externalServerUrl: options.externalServer,
     });
 
     console.log(`Running benchmark: ${scenario.name}`);

@@ -15,11 +15,14 @@ export interface BenchmarkRunnerOptions {
   serverCwd?: string;
   clientUrl?: string;
   clientDevUrl?: string;
+  cpuThrottle?: number;
   withClient?: boolean;
   headless?: boolean;
   verbose?: boolean;
   noPerfApi?: boolean;
   logFile?: string;
+  /** Skip server startup and connect to an already-running server at this URL */
+  externalServerUrl?: string;
 }
 
 export interface BenchmarkResult {
@@ -55,11 +58,13 @@ export default class BenchmarkRunner {
       serverCwd: options?.serverCwd ?? resolveDefaultServerCwd(process.cwd()),
       clientUrl: options?.clientUrl ?? 'https://local.hytopiahosting.com:8080',
       clientDevUrl: options?.clientDevUrl ?? '',
+      cpuThrottle: options?.cpuThrottle ?? 1,
       withClient: options?.withClient ?? false,
       headless: options?.headless ?? true,
       verbose: options?.verbose ?? false,
       noPerfApi: options?.noPerfApi ?? false,
       logFile: options?.logFile ?? '',
+      externalServerUrl: options?.externalServerUrl ?? '',
     };
     this._collector = new MetricCollector();
     this._processMonitor = new ProcessMonitor();
@@ -77,12 +82,19 @@ export default class BenchmarkRunner {
     let processMetrics: ProcessMetrics | undefined;
 
     try {
-      await this._startServer();
+      if (this._options.externalServerUrl) {
+        // Use external server — skip startup, just set the URL
+        this._options.clientUrl = this._options.externalServerUrl;
+        this._serverApi = new ServerApiClient(this._options.externalServerUrl);
+        this._log(`[bench] Using external server: ${this._options.externalServerUrl}`);
+      } else {
+        await this._startServer();
 
-      // start process monitor as soon as server PID is available
-      if (this._serverProcess?.pid) {
-        this._log(`[bench] Starting process monitor (pid=${this._serverProcess.pid})`);
-        this._processMonitor.start(this._serverProcess.pid);
+        // start process monitor as soon as server PID is available
+        if (this._serverProcess?.pid) {
+          this._log(`[bench] Starting process monitor (pid=${this._serverProcess.pid})`);
+          this._processMonitor.start(this._serverProcess.pid);
+        }
       }
 
       await this._serverApi.waitForHealthy();
@@ -117,6 +129,11 @@ export default class BenchmarkRunner {
             this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
           } else {
             this._log('[bench] Client perf bridge ready');
+          }
+
+          if (this._options.cpuThrottle > 1) {
+            this._log(`[bench] Applying startup CPU throttle: ${this._options.cpuThrottle}x`);
+            await this._headlessClient.setCpuThrottle(this._options.cpuThrottle);
           }
         } catch (err: any) {
           this._log(`[bench] WARNING: Headless client failed to launch: ${err?.message ?? err}`);
@@ -345,6 +362,18 @@ export default class BenchmarkRunner {
               }
             }
             break;
+          case 'send_chat':
+            if (this._headlessClient && action.message) {
+              this._log(`[bench]   Sending chat: ${action.message}`);
+
+              try {
+                await this._headlessClient.sendChatMessage(action.message);
+                await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+              } catch {
+                this._log('[bench]   send_chat: failed (non-fatal)');
+              }
+            }
+            break;
           case 'custom':
             throw new Error(`Action not supported yet: ${action.type}`);
         }
@@ -548,8 +577,9 @@ export default class BenchmarkRunner {
 
   private _buildBaseline(metrics: CollectedMetrics): BaselineResult {
     const snapshots = metrics.serverSnapshots;
+    const clientSnapshots = metrics.clientSnapshots;
 
-    if (snapshots.length === 0) {
+    if (snapshots.length === 0 && clientSnapshots.length === 0) {
       return {
         avgTickMs: 0,
         maxTickMs: 0,
@@ -557,6 +587,37 @@ export default class BenchmarkRunner {
         p99TickMs: 0,
         ticksOverBudgetPct: 0,
         avgMemoryMb: 0,
+        operations: {},
+      };
+    }
+
+    if (snapshots.length === 0) {
+      // No server snapshots (e.g. external server without PerfHarness) — build client-only baseline
+      const client = clientSnapshots.length > 0
+        ? {
+            avgFps: average(clientSnapshots, s => s.fps),
+            minFps: Math.min(...clientSnapshots.map(s => s.fps)),
+            avgFrameTimeMs: average(clientSnapshots, s => s.frameTimeMs),
+            avgDrawCalls: average(clientSnapshots, s => s.drawCalls),
+            maxDrawCalls: max(clientSnapshots, s => s.drawCalls),
+            avgTriangles: average(clientSnapshots, s => s.triangles),
+            maxTriangles: max(clientSnapshots, s => s.triangles),
+            avgGeometries: average(clientSnapshots, s => s.geometries ?? 0),
+            avgEntities: average(clientSnapshots, s => s.entities?.count ?? 0),
+            avgVisibleChunks: average(clientSnapshots, s => s.chunks?.visible ?? 0),
+            avgUsedMemoryMb: average(clientSnapshots, s => s.usedMemoryMb ?? 0),
+          }
+        : undefined;
+
+      return {
+        avgTickMs: 0,
+        maxTickMs: 0,
+        p95TickMs: 0,
+        p99TickMs: 0,
+        ticksOverBudgetPct: 0,
+        avgMemoryMb: 0,
+        avgFps: client?.avgFps,
+        client,
         operations: {},
       };
     }
@@ -582,8 +643,6 @@ export default class BenchmarkRunner {
         };
       }
     }
-
-    const clientSnapshots = metrics.clientSnapshots;
 
     const client = clientSnapshots.length > 0
       ? {

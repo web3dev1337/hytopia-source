@@ -1,0 +1,66 @@
+name: "zoo-game-full"
+description: "Zoo Game walkthrough using /fillzoo on an external game server, with client rendering metrics"
+warmupMs: 5000
+phases:
+  - name: setup-zoo
+    actions:
+      - type: send_chat
+        message: "/fillzoo"
+        durationMs: 3000
+  - name: wait-for-animals
+    actions:
+      - type: wait_for_entities
+        count: 20
+        durationMs: 45000
+      - type: wait
+        durationMs: 5000
+  - name: walkthrough
+    collect: true
+    duration: 45s
+    actions:
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 500
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      - type: set_camera
+        yaw: -1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      - type: set_camera
+        yaw: 3.14
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      - type: set_camera
+        yaw: 1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+thresholds:
+  tick_duration_ms:
+    avg: 16
+    p99: 30
+  memory_mb:
+    max: 768
+  client:
+    fps_avg: 10
+    draw_calls_max: 500
+    triangles_max: 3000000
+    frame_time_ms_max: 300
