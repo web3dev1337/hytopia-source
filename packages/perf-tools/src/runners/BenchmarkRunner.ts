@@ -99,6 +99,10 @@ export default class BenchmarkRunner {
 
           await this._headlessClient.launch();
 
+          // Warm up the self-signed HTTPS cert by visiting the server URL first
+          this._log('[bench] Warming up server HTTPS cert in headless browser...');
+          await this._headlessClient.warmCert(this._options.clientUrl);
+
           // Navigate with ?join=<server host> and ?perf=1 (auto-appended by HeadlessClient)
           const serverUrl = new URL(this._options.clientUrl);
           const clientNavUrl = new URL(this._options.clientDevUrl);

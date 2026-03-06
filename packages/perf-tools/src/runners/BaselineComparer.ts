@@ -97,10 +97,10 @@ export default class BaselineComparer {
       entries.push(this._compareMetric('net.avgSerializationMs', baseline.network.avgSerializationMs, current.network.avgSerializationMs));
     }
 
-    const allBaselineOps = new Set([...Object.keys(baseline.operations), ...Object.keys(current.operations)]);
+    const allBaselineOps = new Set([...Object.keys(baseline.operations ?? {}), ...Object.keys(current.operations ?? {})]);
 
     for (const op of allBaselineOps) {
-      if (baseline.operations[op] && current.operations[op]) {
+      if (baseline.operations?.[op] && current.operations?.[op]) {
         entries.push(this._compareMetric(`ops.${op}.avgMs`, baseline.operations[op].avgMs, current.operations[op].avgMs));
         entries.push(this._compareMetric(`ops.${op}.p95Ms`, baseline.operations[op].p95Ms, current.operations[op].p95Ms));
       }
@@ -123,8 +123,14 @@ export default class BaselineComparer {
 
   public static loadBaseline(filePath: string): BaselineResult {
     const content = fs.readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(content);
 
-    return JSON.parse(content) as BaselineResult;
+    // Support both raw baseline files and full report files (which have a .baseline field)
+    if (data.baseline && typeof data.baseline === 'object' && 'avgTickMs' in data.baseline) {
+      return data.baseline as BaselineResult;
+    }
+
+    return data as BaselineResult;
   }
 
   public static saveBaseline(filePath: string, baseline: BaselineResult): void {

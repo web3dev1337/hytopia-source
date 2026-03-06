@@ -23,3 +23,13 @@
 - [x] ConsoleReporter — rich client section (FPS, draw calls, triangles, entities, chunks, heap)
 - [x] Client thresholds — fps_min, fps_avg, draw_calls_max, triangles_max, frame_time_ms_max
 - [x] CLI — --with-client, --client-dev-url flags
+- [x] HeadlessClient fix — waitUntil 'load' instead of 'networkidle2' (game keeps persistent connections)
+- [x] BenchmarkRunner — graceful HeadlessClient error handling (try-catch around launch)
+- [x] Verified: client metrics pipeline — FPS avg=22.6, draw calls avg=11, triangles avg=22, JS heap avg=22.9MB (idle scene, no entities/chunks in headless)
+- [x] Fixed: HeadlessClient ignoreHTTPSErrors + CDP Security.setIgnoreCertificateErrors
+- [x] Fixed: Patched fetch() to strip unsupported targetAddressSpace (Chrome PNA API)
+- [x] Fixed: warmCert step to pre-accept self-signed HTTPS cert
+- [x] Fixed: Replaced --disable-gpu with --use-gl=swiftshader for WebGL rendering
+- [x] Fixed: BaselineComparer operations null-safety + loadBaseline nested format support
+- [x] A/B Benchmark PR #2 (blob shadows) — COMPLETED with real client metrics
+- [x] All pushed to origin

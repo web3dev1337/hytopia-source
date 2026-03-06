@@ -40,14 +40,18 @@ export default class HeadlessClient {
 
     this._browser = await puppeteer.default.launch({
       headless: this._options.headless ? 'new' : false,
+      ignoreHTTPSErrors: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-gpu',
         '--ignore-certificate-errors',
+        '--allow-insecure-localhost',
+        '--disable-web-security',
+        '--disable-features=PrivateNetworkAccessSendPreflights',
         '--enable-precise-memory-info',
         '--disable-notifications',
         '--autoplay-policy=no-user-gesture-required',
+        '--use-gl=swiftshader',
         `--window-size=${this._options.width},${this._options.height}`,
       ],
     });
@@ -64,10 +68,59 @@ export default class HeadlessClient {
       deviceScaleFactor: this._options.deviceScaleFactor,
     });
 
-    if (this._options.collectPerformance) {
-      const cdp = await page.createCDPSession();
+    // Forward browser console to Node stdout for debugging
+    page.on('console', (msg: any) => {
+      const type = msg.type();
+      const text = msg.text();
 
+      if (type === 'error' || type === 'warning') {
+        console.log(`[client:${type}] ${text}`);
+      }
+    });
+
+    page.on('pageerror', (err: any) => {
+      console.log(`[client:error] ${err.message ?? err}`);
+    });
+
+    const cdp = await page.createCDPSession();
+
+    // Bypass certificate errors via CDP (--ignore-certificate-errors doesn't work in headless: 'new')
+    await cdp.send('Security.setIgnoreCertificateErrors', { ignore: true });
+
+    if (this._options.collectPerformance) {
       await cdp.send('Performance.enable');
+    }
+
+    // Patch fetch() to strip unsupported targetAddressSpace option
+    // (Chrome's Private Network Access API is not available in all Chrome versions)
+    await page.evaluateOnNewDocument(() => {
+      const originalFetch = window.fetch.bind(window);
+
+      (window as any).fetch = function(input: any, init?: any) {
+        if (init && 'targetAddressSpace' in init) {
+          const { targetAddressSpace: _, ...rest } = init;
+
+          return originalFetch(input, rest);
+        }
+
+        return originalFetch(input, init);
+      };
+    });
+  }
+
+  /**
+   * Visit the game server URL once to warm up the self-signed HTTPS cert
+   * in Chrome's cert cache. Without this, in-page fetch() to the server fails.
+   */
+  public async warmCert(serverUrl: string): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    try {
+      await page.goto(serverUrl, { waitUntil: 'load', timeout: 15000 });
+    } catch {
+      // Expected — self-signed cert page may fail but Chrome records the exception
     }
   }
 

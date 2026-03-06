@@ -1,0 +1,115 @@
+{
+  "timestamp": "2026-03-06T04:27:59.625Z",
+  "scenario": "stress-test",
+  "durationMs": 73358,
+  "baseline": {
+    "avgTickMs": 0.7359029286488398,
+    "maxTickMs": 13.290815000000293,
+    "p95TickMs": 1.829545699999653,
+    "p99TickMs": 3.758559049999955,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 65.29272626241048,
+    "avgFps": 26.133333333333333,
+    "client": {
+      "avgFps": 26.133333333333333,
+      "minFps": 3,
+      "avgFrameTimeMs": 83.7683333337307,
+      "avgDrawCalls": 21.933333333333334,
+      "maxDrawCalls": 34,
+      "avgTriangles": 15564.7,
+      "maxTriangles": 16717,
+      "avgGeometries": 18.983333333333334,
+      "avgEntities": 160,
+      "avgVisibleChunks": 6,
+      "avgUsedMemoryMb": 42.87554248174032
+    },
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.23253740997715816,
+        "p95Ms": 0.6180427999991783
+      },
+      "physics_step": {
+        "avgMs": 0.17034304841306572,
+        "p95Ms": 0.28114455000083277
+      },
+      "physics_cleanup": {
+        "avgMs": 0.005363463158733647,
+        "p95Ms": 0.007633716666593197
+      },
+      "simulation_step": {
+        "avgMs": 0.18412275955659105,
+        "p95Ms": 0.31188256666694847
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.13922205929656295,
+        "p95Ms": 0.22354569999891585
+      },
+      "world_tick": {
+        "avgMs": 0.7279635695853309,
+        "p95Ms": 1.7226242000005791
+      },
+      "ticker_tick": {
+        "avgMs": 0.7914679062679743,
+        "p95Ms": 1.8152888833331418
+      },
+      "serialize_packets": {
+        "avgMs": 0.04350473671018177,
+        "p95Ms": 0.06910131666694118
+      },
+      "send_packets": {
+        "avgMs": 0.2378755490273082,
+        "p95Ms": 0.3898857000008017
+      },
+      "send_all_packets": {
+        "avgMs": 0.25720112163234377,
+        "p95Ms": 0.42160113333417637
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.007394239075581019,
+        "p95Ms": 0.011449733333120094
+      },
+      "network_synchronize": {
+        "avgMs": 0.3093806637599563,
+        "p95Ms": 0.49408704999987096
+      }
+    },
+    "network": {
+      "totalBytesSent": 1968736,
+      "totalBytesReceived": 158,
+      "maxConnectedPlayers": 1,
+      "avgBytesSentPerSecond": 28946.035070796195,
+      "maxBytesSentPerSecond": 39833.57688983931,
+      "avgBytesReceivedPerSecond": 2.3142748083937827,
+      "maxBytesReceivedPerSecond": 6.7732385632630665,
+      "avgPacketsSentPerSecond": 31.198995516308436,
+      "maxPacketsSentPerSecond": 33.44922483163599,
+      "avgPacketsReceivedPerSecond": 0.7040805818582495,
+      "maxPacketsReceivedPerSecond": 1.9352110180751618,
+      "avgSerializationMs": 0.039125146425009125,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "spawn-entities",
+      "durationMs": 268,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 2045,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 62098,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 60
+  }
+}
