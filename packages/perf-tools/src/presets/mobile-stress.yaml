@@ -1,0 +1,34 @@
+name: "mobile-stress"
+description: "Simulate mobile device: 4x CPU throttle + 200 idle entities. Measures client rendering under constrained CPU."
+warmupMs: 5000
+phases:
+  - name: setup
+    actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
+      - type: spawn_bots
+        count: 200
+        behavior: idle
+      - type: throttle_cpu
+        rate: 4
+  - name: wait-for-world
+    actions:
+      - type: wait_for_entities
+        count: 10
+        durationMs: 30000
+      - type: wait
+        durationMs: 8000
+  - name: measure
+    collect: true
+    duration: 30s
+thresholds:
+  tick_duration_ms:
+    avg: 12
+    p99: 20
+  memory_mb:
+    max: 512
+  client:
+    fps_avg: 5
+    draw_calls_max: 200
+    triangles_max: 1000000
+    frame_time_ms_max: 500
