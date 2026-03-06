@@ -33,6 +33,8 @@ program
   .option('--no-headless', 'Run browser in visible mode')
   .option('--no-perf-api', 'Skip PerfHarness API, use only OS-level monitoring')
   .option('--log-file <path>', 'Capture server stdout/stderr to file')
+  .option('--with-client', 'Launch headless browser client and collect client-side metrics')
+  .option('--client-dev-url <url>', 'URL for the Vite client dev server', 'http://localhost:5173')
   .option('--verbose', 'Enable verbose logging')
   .action(async (scenarioPath, options) => {
     let scenario;
@@ -57,6 +59,8 @@ program
       serverCommand: options.serverCmd,
       serverCwd: options.serverCwd,
       clientUrl: options.clientUrl,
+      clientDevUrl: options.clientDevUrl,
+      withClient: options.withClient ?? false,
       headless: options.headless !== false,
       verbose: options.verbose,
       noPerfApi: options.perfApi === false,

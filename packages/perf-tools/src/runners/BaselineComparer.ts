@@ -8,6 +8,19 @@ export interface BaselineResult {
   ticksOverBudgetPct: number;
   avgMemoryMb: number;
   avgFps?: number;
+  client?: {
+    avgFps: number;
+    minFps: number;
+    avgFrameTimeMs: number;
+    avgDrawCalls: number;
+    maxDrawCalls: number;
+    avgTriangles: number;
+    maxTriangles: number;
+    avgGeometries: number;
+    avgEntities: number;
+    avgVisibleChunks: number;
+    avgUsedMemoryMb: number;
+  };
   operations: Record<string, { avgMs: number; p95Ms: number }>;
   network?: {
     totalBytesSent: number;
@@ -68,6 +81,14 @@ export default class BaselineComparer {
 
     if (baseline.avgFps !== undefined && current.avgFps !== undefined) {
       entries.push(this._compareMetric('avgFps', baseline.avgFps, current.avgFps, true));
+    }
+
+    if (baseline.client && current.client) {
+      entries.push(this._compareMetric('client.avgFps', baseline.client.avgFps, current.client.avgFps, true));
+      entries.push(this._compareMetric('client.minFps', baseline.client.minFps, current.client.minFps, true));
+      entries.push(this._compareMetric('client.avgDrawCalls', baseline.client.avgDrawCalls, current.client.avgDrawCalls));
+      entries.push(this._compareMetric('client.avgTriangles', baseline.client.avgTriangles, current.client.avgTriangles));
+      entries.push(this._compareMetric('client.avgFrameTimeMs', baseline.client.avgFrameTimeMs, current.client.avgFrameTimeMs));
     }
 
     if (baseline.network && current.network) {

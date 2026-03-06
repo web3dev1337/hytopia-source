@@ -55,6 +55,32 @@ export interface ClientSnapshot {
   drawCalls: number;
   triangles: number;
   textureMemoryMb: number;
+  geometries?: number;
+  textures?: number;
+  programs?: number;
+  usedMemoryMb?: number;
+  totalMemoryMb?: number;
+  entities?: {
+    count: number;
+    inViewDistance: number;
+    frustumCulled: number;
+    staticEnvironment: number;
+  };
+  chunks?: {
+    count: number;
+    visible: number;
+    blocks: number;
+    opaqueFaces: number;
+    transparentFaces: number;
+    liquidFaces: number;
+  };
+  gltf?: {
+    files: number;
+    sourceMeshes: number;
+    clonedMeshes: number;
+    instancedMeshes: number;
+    drawCallsSaved: number;
+  };
 }
 
 export interface TickReportEntry {

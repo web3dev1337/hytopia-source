@@ -23,12 +23,14 @@ import Renderer from './core/Renderer';
 import SettingsManager from './settings/SettingsManager';
 import UIManager from './ui/UIManager';
 import ChunkWorkerClient from './workers/ChunkWorkerClient';
+import PerfBridge from './core/PerfBridge';
 
 const DEBUG_QUERY_STRINGS = 'debug';
 
 export default class Game {
   private static _instance: Game | undefined;
   readonly inDebugMode = new URLSearchParams(window.location.search).has(DEBUG_QUERY_STRINGS);
+  readonly inPerfMode = new URLSearchParams(window.location.search).get('perf') === '1';
 
   private _arrowManager: ArrowManager;
   private _audioManager: AudioManager;
@@ -65,6 +67,10 @@ export default class Game {
     this._camera = new Camera(this);
     this._renderer = new Renderer(this);
     this._chunkWorkerClient = new ChunkWorkerClient();
+
+    if (this.inPerfMode) {
+      new PerfBridge(this);
+    }
 
     this._arrowManager = new ArrowManager(this);
     this._audioManager = new AudioManager(this);

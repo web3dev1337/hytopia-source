@@ -30,7 +30,21 @@ export default class ConsoleReporter {
       console.log(`  FDs: max=${pm.maxFds}`);
     }
 
-    if (b.avgFps !== undefined) {
+    if (b.client) {
+      console.log('');
+      console.log('Client Performance:');
+      console.log(`  FPS: avg=${b.client.avgFps.toFixed(1)} min=${b.client.minFps.toFixed(1)}`);
+      console.log(`  Frame time: avg=${b.client.avgFrameTimeMs.toFixed(2)}ms`);
+      console.log(`  Draw calls: avg=${b.client.avgDrawCalls.toFixed(0)} max=${b.client.maxDrawCalls}`);
+      console.log(`  Triangles: avg=${this._formatK(b.client.avgTriangles)} max=${this._formatK(b.client.maxTriangles)}`);
+      console.log(`  Geometries: avg=${b.client.avgGeometries.toFixed(0)}`);
+      console.log(`  Entities: avg=${b.client.avgEntities.toFixed(0)}`);
+      console.log(`  Visible chunks: avg=${b.client.avgVisibleChunks.toFixed(0)}`);
+
+      if (b.client.avgUsedMemoryMb > 0) {
+        console.log(`  JS Heap: avg=${b.client.avgUsedMemoryMb.toFixed(1)}MB`);
+      }
+    } else if (b.avgFps !== undefined) {
       console.log(`Client FPS: ${b.avgFps.toFixed(1)} avg`);
     }
 
@@ -121,6 +135,45 @@ export default class ConsoleReporter {
       console.log(`  ${pass ? 'PASS' : 'FAIL'} memory ${b.avgMemoryMb.toFixed(1)}MB <= ${t.memory_mb.max}MB`);
     }
 
+    if (t.client && b.client) {
+      const ct = t.client;
+
+      if (ct.fps_min !== undefined) {
+        const pass = b.client.minFps >= ct.fps_min;
+
+        allPass = allPass && pass;
+        console.log(`  ${pass ? 'PASS' : 'FAIL'} client minFps ${b.client.minFps.toFixed(1)} >= ${ct.fps_min}`);
+      }
+
+      if (ct.fps_avg !== undefined) {
+        const pass = b.client.avgFps >= ct.fps_avg;
+
+        allPass = allPass && pass;
+        console.log(`  ${pass ? 'PASS' : 'FAIL'} client avgFps ${b.client.avgFps.toFixed(1)} >= ${ct.fps_avg}`);
+      }
+
+      if (ct.draw_calls_max !== undefined) {
+        const pass = b.client.maxDrawCalls <= ct.draw_calls_max;
+
+        allPass = allPass && pass;
+        console.log(`  ${pass ? 'PASS' : 'FAIL'} client maxDrawCalls ${b.client.maxDrawCalls} <= ${ct.draw_calls_max}`);
+      }
+
+      if (ct.triangles_max !== undefined) {
+        const pass = b.client.maxTriangles <= ct.triangles_max;
+
+        allPass = allPass && pass;
+        console.log(`  ${pass ? 'PASS' : 'FAIL'} client maxTriangles ${b.client.maxTriangles} <= ${ct.triangles_max}`);
+      }
+
+      if (ct.frame_time_ms_max !== undefined) {
+        const pass = b.client.avgFrameTimeMs <= ct.frame_time_ms_max;
+
+        allPass = allPass && pass;
+        console.log(`  ${pass ? 'PASS' : 'FAIL'} client avgFrameTime ${b.client.avgFrameTimeMs.toFixed(2)}ms <= ${ct.frame_time_ms_max}ms`);
+      }
+    }
+
     if (t.network?.maxBytesPerSecond !== undefined && b.network) {
       const pass = b.network.maxBytesSentPerSecond <= t.network.maxBytesPerSecond;
 
@@ -130,6 +183,10 @@ export default class ConsoleReporter {
 
     console.log(`  Overall: ${allPass ? 'ALL PASS' : 'SOME FAILED'}`);
     console.log('');
+  }
+
+  private _formatK(n: number): string {
+    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toFixed(0);
   }
 
   private _statusIcon(status: 'pass' | 'warning' | 'fail'): string {

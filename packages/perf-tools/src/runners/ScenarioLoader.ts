@@ -59,6 +59,13 @@ export interface ScenarioThresholds {
   memory_mb?: { max?: number };
   fps?: { min?: number; avg?: number };
   network?: { maxBytesPerSecond?: number };
+  client?: {
+    fps_min?: number;
+    fps_avg?: number;
+    draw_calls_max?: number;
+    triangles_max?: number;
+    frame_time_ms_max?: number;
+  };
 }
 
 export interface Scenario {

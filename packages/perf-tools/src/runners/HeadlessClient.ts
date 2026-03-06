@@ -44,6 +44,10 @@ export default class HeadlessClient {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-gpu',
+        '--ignore-certificate-errors',
+        '--enable-precise-memory-info',
+        '--disable-notifications',
+        '--autoplay-policy=no-user-gesture-required',
         `--window-size=${this._options.width},${this._options.height}`,
       ],
     });
@@ -72,10 +76,54 @@ export default class HeadlessClient {
 
     if (!page) throw new Error('Client not launched. Call launch() first.');
 
-    const target = url ?? this._options.url;
+    const target = new URL(url ?? this._options.url);
 
-    await page.goto(target, { waitUntil: 'networkidle2', timeout: 30000 });
+    target.searchParams.set('perf', '1');
+
+    await page.goto(target.toString(), { waitUntil: 'networkidle2', timeout: 60000 });
     this._connected = true;
+  }
+
+  public async waitForPerfReady(timeoutMs: number = 30000): Promise<boolean> {
+    const page = this._page as any;
+
+    if (!page) return false;
+
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const ready = await page.evaluate(() => {
+          const perf = (window as any).__HYTOPIA_PERF__;
+
+          return perf && typeof perf.snapshot === 'function';
+        });
+
+        if (ready) return true;
+      } catch {
+        // page not ready yet
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    return false;
+  }
+
+  public async dismissModals(): Promise<void> {
+    const page = this._page as any;
+
+    if (!page) return;
+
+    try {
+      await page.evaluate(() => {
+        const buttons = document.querySelectorAll('.hytopia-modal-button-ok');
+
+        buttons.forEach((btn: any) => btn.click());
+      });
+    } catch {
+      // no modals present
+    }
   }
 
   public async collectClientMetrics(): Promise<ClientSnapshot | null> {
@@ -84,10 +132,18 @@ export default class HeadlessClient {
     if (!page || !this._connected) return null;
 
     try {
+      // Dismiss any modals that might have appeared
+      await this.dismissModals();
+
       const metrics = await page.evaluate(() => {
         const perf = (window as any).__HYTOPIA_PERF__;
 
         if (!perf) return null;
+
+        // Prefer snapshot() method (rich data), fall back to flat properties
+        if (typeof perf.snapshot === 'function') {
+          return perf.snapshot();
+        }
 
         return {
           fps: perf.fps ?? 0,

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
+import HeadlessClient from './HeadlessClient.js';
 import MetricCollector, { type CollectedMetrics } from './MetricCollector.js';
 import ProcessMonitor, { type ProcessMetrics } from './ProcessMonitor.js';
 import ServerApiClient from './ServerApiClient.js';
@@ -13,6 +14,8 @@ export interface BenchmarkRunnerOptions {
   serverCommand?: string;
   serverCwd?: string;
   clientUrl?: string;
+  clientDevUrl?: string;
+  withClient?: boolean;
   headless?: boolean;
   verbose?: boolean;
   noPerfApi?: boolean;
@@ -39,6 +42,7 @@ export default class BenchmarkRunner {
   private _collector: MetricCollector;
   private _processMonitor: ProcessMonitor;
   private _serverProcess: ChildProcess | null = null;
+  private _headlessClient: HeadlessClient | null = null;
   private _serverApi: ServerApiClient;
   private _wsClients: WsClient[] = [];
   private _perfApiAvailable: boolean = true;
@@ -50,6 +54,8 @@ export default class BenchmarkRunner {
       serverCommand: options?.serverCommand ?? 'npm run build:perf-harness && node src/perf-harness.mjs',
       serverCwd: options?.serverCwd ?? resolveDefaultServerCwd(process.cwd()),
       clientUrl: options?.clientUrl ?? 'https://local.hytopiahosting.com:8080',
+      clientDevUrl: options?.clientDevUrl ?? '',
+      withClient: options?.withClient ?? false,
       headless: options?.headless ?? true,
       verbose: options?.verbose ?? false,
       noPerfApi: options?.noPerfApi ?? false,
@@ -80,6 +86,34 @@ export default class BenchmarkRunner {
       }
 
       await this._serverApi.waitForHealthy();
+
+      // Launch headless client if configured
+      if (this._options.withClient && this._options.clientDevUrl) {
+        this._log(`[bench] Launching headless client: ${this._options.clientDevUrl}`);
+
+        this._headlessClient = new HeadlessClient({
+          url: this._options.clientDevUrl,
+          headless: this._options.headless,
+        });
+
+        await this._headlessClient.launch();
+
+        // Navigate with ?join=<server host> and ?perf=1 (auto-appended by HeadlessClient)
+        const serverUrl = new URL(this._options.clientUrl);
+        const clientNavUrl = new URL(this._options.clientDevUrl);
+
+        clientNavUrl.searchParams.set('join', serverUrl.host);
+
+        await this._headlessClient.navigate(clientNavUrl.toString());
+
+        const perfReady = await this._headlessClient.waitForPerfReady(30000);
+
+        if (!perfReady) {
+          this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
+        } else {
+          this._log('[bench] Client perf bridge ready');
+        }
+      }
 
       // probe PerfHarness availability unless explicitly disabled
       if (this._perfApiAvailable) {
@@ -278,6 +312,18 @@ export default class BenchmarkRunner {
           this._perfApiAvailable = false;
         }
       }
+
+      if (this._headlessClient?.isConnected) {
+        try {
+          const clientSnapshot = await this._headlessClient.collectClientMetrics();
+
+          if (clientSnapshot) {
+            this._collector.addClientSnapshot(clientSnapshot);
+          }
+        } catch {
+          this._log('[bench] Client metric collection failed');
+        }
+      }
     }
   }
 
@@ -391,6 +437,11 @@ export default class BenchmarkRunner {
   }
 
   private async _cleanup(): Promise<void> {
+    if (this._headlessClient) {
+      await this._headlessClient.close();
+      this._headlessClient = null;
+    }
+
     for (const client of this._wsClients) {
       await client.close();
     }
@@ -457,6 +508,23 @@ export default class BenchmarkRunner {
     }
 
     const clientSnapshots = metrics.clientSnapshots;
+
+    const client = clientSnapshots.length > 0
+      ? {
+          avgFps: average(clientSnapshots, s => s.fps),
+          minFps: Math.min(...clientSnapshots.map(s => s.fps)),
+          avgFrameTimeMs: average(clientSnapshots, s => s.frameTimeMs),
+          avgDrawCalls: average(clientSnapshots, s => s.drawCalls),
+          maxDrawCalls: max(clientSnapshots, s => s.drawCalls),
+          avgTriangles: average(clientSnapshots, s => s.triangles),
+          maxTriangles: max(clientSnapshots, s => s.triangles),
+          avgGeometries: average(clientSnapshots, s => s.geometries ?? 0),
+          avgEntities: average(clientSnapshots, s => s.entities?.count ?? 0),
+          avgVisibleChunks: average(clientSnapshots, s => s.chunks?.visible ?? 0),
+          avgUsedMemoryMb: average(clientSnapshots, s => s.usedMemoryMb ?? 0),
+        }
+      : undefined;
+
     const avgFps = clientSnapshots.length > 0
       ? clientSnapshots.reduce((s, v) => s + v.fps, 0) / clientSnapshots.length
       : undefined;
@@ -488,6 +556,7 @@ export default class BenchmarkRunner {
       ticksOverBudgetPct: totalTicks > 0 ? (overBudget / totalTicks) * 100 : 0,
       avgMemoryMb,
       avgFps,
+      client,
       operations,
       network,
     };

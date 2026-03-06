@@ -17,3 +17,9 @@
 - [x] Zoo game — added missing Entity methods (setModelAnimationsPlaybackRate, startModelLoopedAnimations, startModelOneshotAnimations, setModelNodeEmissiveColor, setModelNodeEmissiveIntensity)
 - [x] HyFire2 benchmark — PASS: avg tick 0.61ms, p99 1.34ms, 431MB heap, 1.2GB RSS
 - [x] Zoo Game benchmark (full PerfHarness) — PASS: avg tick 0.25ms, p99 0.85ms, 313MB heap, 782MB RSS
+- [x] Client PerfBridge — window.__HYTOPIA_PERF__.snapshot() exposes FPS, draw calls, triangles, entities, chunks, GLTF, memory
+- [x] HeadlessClient updated — snapshot(), waitForPerfReady(), Chrome flags, auto ?perf=1&join=
+- [x] BenchmarkRunner — HeadlessClient lifecycle + client metrics polling
+- [x] ConsoleReporter — rich client section (FPS, draw calls, triangles, entities, chunks, heap)
+- [x] Client thresholds — fps_min, fps_avg, draw_calls_max, triangles_max, frame_time_ms_max
+- [x] CLI — --with-client, --client-dev-url flags
