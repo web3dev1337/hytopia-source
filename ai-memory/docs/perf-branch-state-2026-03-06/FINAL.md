@@ -144,6 +144,15 @@ Important clarification:
 
 HyFire2 and Zoo Game are not first-class game source trees inside this repo. This repo provides the engine plus the tooling to benchmark those games from their own directories.
 
+### Local Paths Used On This Machine
+
+The concrete local game paths that were actually discovered and used during verification on this machine are:
+
+- HyFire2: `/home/ab/GitHub/games/hyfire2`
+- Zoo Game: `/home/ab/GitHub/games/hytopia/zoo-game/work1`
+
+These paths are machine-specific and do not belong in the repo-wide codebase inventory, but they do belong in this perf state/runbook so the next real-game benchmark does not require rediscovery.
+
 ### CI Automation
 
 Core files:
