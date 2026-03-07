@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 if [ -z "$1" ]; then
   echo "Usage: $0 <game-dir>"
   echo "Examples:"
-  echo "  $0 /home/ab/GitHub/games/hyfire2"
+  echo "  $0 /home/ab/GitHub/games/hyfire2-sdk-compat"
   echo "  $0 /home/ab/GitHub/games/hytopia/zoo-game/work1"
   exit 1
 fi

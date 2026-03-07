@@ -24,6 +24,7 @@ Follow-up update from local real-game verification:
 - joinable external-game runs exposed a local-dev crash path where sessionless local players still attempted live platform cosmetics lookup
 - that engine-side issue is now fixed in [PlatformGateway.ts](/home/ab/GitHub/hytopia/work1/server/src/networking/PlatformGateway.ts) and [Player.ts](/home/ab/GitHub/hytopia/work1/server/src/players/Player.ts)
 - result: local HyFire2 observation runs no longer fall over on human join just because the production GraphQL cosmetics websocket rejects the request
+- HyFire2 itself also needed a game-side PlayerCamera compatibility fix so bots-only spectator setup no longer crashes after human team selection during observation runs
 
 After this cleanup, the branch should be understood as:
 
@@ -159,7 +160,7 @@ HyFire2 and Zoo Game are not first-class game source trees inside this repo. Thi
 
 The concrete local game paths that were actually discovered and used during verification on this machine are:
 
-- HyFire2: `/home/ab/GitHub/games/hyfire2`
+- HyFire2: `/home/ab/GitHub/games/hyfire2-sdk-compat`
 - Zoo Game: `/home/ab/GitHub/games/hytopia/zoo-game/work1`
 
 These paths are machine-specific and do not belong in the repo-wide codebase inventory, but they do belong in this perf state/runbook so the next real-game benchmark does not require rediscovery.
@@ -207,6 +208,7 @@ Bottom line:
 - the framework was exercised end-to-end
 - it produced usable data
 - it reached both synthetic and real-game scenarios
+- HyFire2 human-join observation runs are now part of the validated real-game flow, provided the game repo is on its SDK-compat branch with the PlayerCamera hidden-node fix
 
 ## Branch Timeline
 

@@ -32,6 +32,14 @@ Options:
 
 Examples:
   bash packages/perf-tools/scripts/run-external-game-benchmark.sh \
+    --game-dir /home/ab/GitHub/games/hyfire2-sdk-compat \
+    --preset hyfire2-bots \
+    --client-url http://localhost:4173 \
+    --server-cmd "AUTO_START_WITH_BOTS=true hytopia start" \
+    --port 8082 \
+    --output perf-results/hyfire2-under-test.json
+
+  bash packages/perf-tools/scripts/run-external-game-benchmark.sh \
     --game-dir /home/ab/GitHub/games/hytopia/zoo-game/work1 \
     --preset zoo-game-full \
     --client-url http://localhost:4173 \
@@ -43,6 +51,10 @@ Examples:
     --client-url http://localhost:4173 \
     --cpu-throttle 4 \
     --verbose
+
+For a long manual HyFire2 observation run instead of a measured benchmark:
+  cd /home/ab/GitHub/games/hyfire2-sdk-compat
+  PORT=8082 AUTO_START_WITH_BOTS=true hytopia start
 EOF
 }
 
