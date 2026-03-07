@@ -124,8 +124,11 @@ Representative presets:
 - [hyfire2-bots.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/hyfire2-bots.yaml)
 - [zoo-game-bots.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-bots.yaml)
 - [zoo-game-full.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-full.yaml)
+- [zoo-game-observe.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-observe.yaml)
 
-`zoo-game-full.yaml` is the cleaned real-game walkthrough preset retained from the local investigation. CPU throttling is no longer hardcoded in the preset; it is now a runner option.
+`zoo-game-full.yaml` is the cleaned real-game walkthrough benchmark retained from the local investigation. It is intentionally single-client: one benchmark browser joins, sends `/fillzoo`, and walks the route while client metrics are collected. It is not the “human joins a world with 5 other movers” observation mode.
+
+`zoo-game-observe.yaml` is the joinable observation preset. It keeps the same Zoo setup but also spawns 5 moving perf bots near the zoo entrance so a human observer sees a busier scene without editing the benchmark by hand. CPU throttling is still a runner option, not hardcoded in either preset.
 
 ### Real Game Integration
 
@@ -224,6 +227,7 @@ This cleanup retains the broadly reusable framework improvements that were still
 - chat-triggered setup support in [HeadlessClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/HeadlessClient.ts)
 - external-server handling and client-only baseline generation in [BenchmarkRunner.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkRunner.ts)
 - a cleaned [zoo-game-full.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-full.yaml) preset
+- a documented [zoo-game-observe.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-observe.yaml) preset for live join/observation runs
 - runner-level `--cpu-throttle` support so desktop/mobile/low-end comparisons no longer require editing YAML
 - scoped local HTTPS handling in [ServerApiClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ServerApiClient.ts) instead of a global TLS-disable environment hack
 
@@ -323,6 +327,7 @@ If you only read a few files, read these:
 4. [BenchmarkRunner.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkRunner.ts)
 5. [PerfBridge.ts](/home/ab/GitHub/hytopia/work1/client/src/core/PerfBridge.ts)
 6. [zoo-game-full.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-full.yaml)
+7. [zoo-game-observe.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-observe.yaml)
 
 ## Bottom Line
 

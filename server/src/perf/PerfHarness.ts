@@ -28,7 +28,7 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_PERF_ENTITY_TAG = 'perf-tools';
 
 type PerfAction =
-  | { type: 'spawn_bots'; count: number; behavior?: string }
+  | { type: 'spawn_bots'; count: number; behavior?: string; origin?: Vector3Like }
   | { type: 'despawn_bots'; count?: number }
   | { type: 'load_map'; mapPath: string; worldId?: number }
   | { type: 'generate_blocks'; blockCount: number; blockTypeId: number; worldId?: number; layout?: 'dense' | 'slab'; slabHeight?: number; origin?: Vector3Like; clear?: boolean }
@@ -139,10 +139,14 @@ function createBehavior(name: string | undefined): BotBehavior | null {
   }
 }
 
-function spawnBots(count: number, behaviorName: string | undefined): { spawned: number } {
+function spawnBots(
+  count: number,
+  behaviorName: string | undefined,
+  origin: Vector3Like | undefined,
+): { spawned: number } {
   const world = WorldManager.instance.getDefaultWorld();
   const spawnedBots = Math.max(0, Math.floor(count));
-  const origin = { x: 0, y: 10, z: 0 };
+  const spawnOrigin = origin ?? { x: 0, y: 10, z: 0 };
   const radius = Math.ceil(Math.sqrt(spawnedBots)) * 2;
 
   for (let i = 0; i < spawnedBots; i++) {
@@ -153,9 +157,9 @@ function spawnBots(count: number, behaviorName: string | undefined): { spawned: 
     BotManager.instance.spawnBot(world, {
       behavior,
       spawnPosition: {
-        x: origin.x + Math.cos(angle) * dist,
-        y: origin.y,
-        z: origin.z + Math.sin(angle) * dist,
+        x: spawnOrigin.x + Math.cos(angle) * dist,
+        y: spawnOrigin.y,
+        z: spawnOrigin.z + Math.sin(angle) * dist,
       },
     });
   }
@@ -568,7 +572,11 @@ export default class PerfHarness {
                 return respondJson(res, 400, { ok: false, error: '"count" is required' });
               }
 
-              const result = spawnBots(action.count, typeof action.behavior === 'string' ? action.behavior : undefined);
+              const result = spawnBots(
+                action.count,
+                typeof action.behavior === 'string' ? action.behavior : undefined,
+                action.origin,
+              );
               respondJson(res, 200, { ok: true, result });
 
               return;

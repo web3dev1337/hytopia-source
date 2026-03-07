@@ -1,0 +1,71 @@
+name: "zoo-game-observe"
+description: "Zoo Game observation run: /fillzoo, 5 moving perf bots near the zoo entrance, plus the benchmark walkthrough client"
+warmupMs: 5000
+phases:
+  - name: setup-zoo
+    actions:
+      - type: despawn_bots
+      - type: send_chat
+        message: "/fillzoo"
+        durationMs: 3000
+      - type: spawn_bots
+        count: 5
+        behavior: random_walk
+        origin: { x: 0, y: 2, z: 25 }
+  - name: wait-for-world
+    actions:
+      - type: wait_for_entities
+        count: 25
+        durationMs: 45000
+      - type: wait
+        durationMs: 5000
+  - name: walkthrough
+    collect: true
+    duration: 5m
+    actions:
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 500
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      - type: set_camera
+        yaw: -1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      - type: set_camera
+        yaw: 3.14
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+      - type: set_camera
+        yaw: 1.57
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 300
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+thresholds:
+  tick_duration_ms:
+    avg: 16
+    p99: 30
+  memory_mb:
+    max: 768
+  client:
+    fps_avg: 10
+    draw_calls_max: 500
+    triangles_max: 3000000
+    frame_time_ms_max: 300

@@ -213,6 +213,7 @@ export default class BenchmarkRunner {
               type: 'spawn_bots',
               count: action.count ?? 0,
               behavior: action.behavior,
+              origin: action.origin,
             });
             break;
           case 'despawn_bots':

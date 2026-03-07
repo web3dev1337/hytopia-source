@@ -42,7 +42,7 @@ interface PerfSnapshotResponse {
 }
 
 export type ServerAction =
-  | { type: 'spawn_bots'; count: number; behavior?: string }
+  | { type: 'spawn_bots'; count: number; behavior?: string; origin?: { x: number; y: number; z: number } }
   | { type: 'despawn_bots'; count?: number }
   | { type: 'load_map'; mapPath: string; worldId?: number }
   | { type: 'generate_blocks'; blockCount: number; blockTypeId: number; worldId?: number; layout?: 'dense' | 'slab'; slabHeight?: number; origin?: { x: number; y: number; z: number }; clear?: boolean }

@@ -16,7 +16,7 @@ PROTOCOL: protocol/ - Packet schemas + definitions (@hytopia.com/server-protocol
 SDK:      sdk/ - Git submodule → hytopiagg/sdk (build output lands here)
 EXAMPLES: sdk-examples/ - Reference games built with the SDK
 ASSETS:   assets/release/ - Default game assets (audio, blocks, maps, models, particles, skyboxes, ui)
-PERF:     packages/perf-tools/ - Benchmark CLI + trace analysis (`hytopia-bench`), headless client metrics, synthetic + real-game presets
+PERF:     packages/perf-tools/ - Benchmark CLI + trace analysis (`hytopia-bench`), headless client metrics, synthetic + real-game presets (`zoo-game-full` benchmark, `zoo-game-observe` joinable observation run)
 CONFIG:   package.json - Monorepo root (npm workspaces)
           server/package.json - Server deps + build scripts
           server/tsconfig.json - Strict TS, path alias @/* → ./src/*
