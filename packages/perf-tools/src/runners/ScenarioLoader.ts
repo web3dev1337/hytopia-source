@@ -7,6 +7,8 @@ export interface ScenarioVector3 {
   z: number;
 }
 
+export type ScenarioClientTarget = 'primary' | 'all' | 'extras';
+
 export interface ScenarioAction {
   type:
     | 'spawn_bots'
@@ -54,6 +56,7 @@ export interface ScenarioAction {
   max?: ScenarioVector3;
   setDefault?: boolean;
   staggerMs?: number;
+  target?: ScenarioClientTarget;
   script?: string;
 }
 
@@ -85,6 +88,7 @@ export interface Scenario {
   phases: ScenarioPhase[];
   thresholds?: ScenarioThresholds;
   clients?: number;
+  browserClients?: number;
   warmupMs?: number;
 }
 
@@ -143,6 +147,7 @@ function validateScenario(raw: unknown): Scenario {
     phases: obj.phases.map(validatePhase),
     thresholds: obj.thresholds as ScenarioThresholds | undefined,
     clients: typeof obj.clients === 'number' ? obj.clients : undefined,
+    browserClients: typeof obj.browserClients === 'number' ? obj.browserClients : undefined,
     warmupMs: typeof obj.warmupMs === 'number' ? obj.warmupMs : undefined,
   };
 }

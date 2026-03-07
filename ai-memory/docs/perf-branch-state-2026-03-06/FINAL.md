@@ -128,7 +128,7 @@ Representative presets:
 
 `zoo-game-full.yaml` is the cleaned real-game walkthrough benchmark retained from the local investigation. It is intentionally single-client: one benchmark browser joins, sends `/fillzoo`, and walks the route while client metrics are collected. It is not the “human joins a world with 5 other movers” observation mode.
 
-`zoo-game-observe.yaml` is the joinable observation preset. It keeps the same Zoo setup but also spawns 5 moving perf bots near the zoo entrance so a human observer sees a busier scene without editing the benchmark by hand. CPU throttling is still a runner option, not hardcoded in either preset.
+`zoo-game-observe.yaml` is the joinable observation preset. It launches 5 real benchmark browser clients, has each one send `/fillzoo` to populate its own zoo, and then moves them during the measured phase so a human observer joins a genuinely busy 6-slot Zoo world. CPU throttling is still a runner option, not hardcoded in either preset.
 
 ### Real Game Integration
 

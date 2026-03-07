@@ -7,7 +7,7 @@ import MetricCollector, { type CollectedMetrics } from './MetricCollector.js';
 import ProcessMonitor, { type ProcessMetrics } from './ProcessMonitor.js';
 import ServerApiClient from './ServerApiClient.js';
 import WsClient from './WsClient.js';
-import { type Scenario, type ScenarioPhase, parseDuration } from './ScenarioLoader.js';
+import { type Scenario, type ScenarioAction, type ScenarioClientTarget, type ScenarioPhase, parseDuration } from './ScenarioLoader.js';
 import type { BaselineResult } from './BaselineComparer.js';
 
 export interface BenchmarkRunnerOptions {
@@ -45,7 +45,7 @@ export default class BenchmarkRunner {
   private _collector: MetricCollector;
   private _processMonitor: ProcessMonitor;
   private _serverProcess: ChildProcess | null = null;
-  private _headlessClient: HeadlessClient | null = null;
+  private _headlessClients: HeadlessClient[] = [];
   private _serverApi: ServerApiClient;
   private _wsClients: WsClient[] = [];
   private _perfApiAvailable: boolean = true;
@@ -99,45 +99,48 @@ export default class BenchmarkRunner {
 
       await this._serverApi.waitForHealthy();
 
-      // Launch headless client if configured
+      // Launch headless browser clients if configured
       if (this._options.withClient && this._options.clientDevUrl) {
         try {
-          this._log(`[bench] Launching headless client: ${this._options.clientDevUrl}`);
-
-          this._headlessClient = new HeadlessClient({
-            url: this._options.clientDevUrl,
-            headless: this._options.headless,
-          });
-
-          await this._headlessClient.launch();
-
-          // Warm up the self-signed HTTPS cert by visiting the server URL first
-          this._log('[bench] Warming up server HTTPS cert in headless browser...');
-          await this._headlessClient.warmCert(this._options.clientUrl);
-
-          // Navigate with ?join=<server host> and ?perf=1 (auto-appended by HeadlessClient)
           const serverUrl = new URL(this._options.clientUrl);
-          const clientNavUrl = new URL(this._options.clientDevUrl);
+          const clientCount = Math.max(1, Math.floor(scenario.browserClients ?? 1));
 
-          clientNavUrl.searchParams.set('join', serverUrl.host);
+          this._log(`[bench] Launching ${clientCount} headless client(s): ${this._options.clientDevUrl}`);
 
-          await this._headlessClient.navigate(clientNavUrl.toString());
+          for (let i = 0; i < clientCount; i++) {
+            const client = new HeadlessClient({
+              url: this._options.clientDevUrl,
+              headless: this._options.headless,
+            });
 
-          const perfReady = await this._headlessClient.waitForPerfReady(30000);
+            this._headlessClients.push(client);
+            await client.launch();
 
-          if (!perfReady) {
-            this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
-          } else {
-            this._log('[bench] Client perf bridge ready');
-          }
+            this._log(`[bench] Warming up server HTTPS cert in headless browser ${i + 1}/${clientCount}...`);
+            await client.warmCert(this._options.clientUrl);
 
-          if (this._options.cpuThrottle > 1) {
-            this._log(`[bench] Applying startup CPU throttle: ${this._options.cpuThrottle}x`);
-            await this._headlessClient.setCpuThrottle(this._options.cpuThrottle);
+            const clientNavUrl = new URL(this._options.clientDevUrl);
+
+            clientNavUrl.searchParams.set('join', serverUrl.host);
+
+            await client.navigate(clientNavUrl.toString());
+
+            const perfReady = await client.waitForPerfReady(30000);
+
+            if (!perfReady && i === 0) {
+              this._log('[bench] WARNING: Client perf bridge not ready after 30s — client metrics may be unavailable');
+            } else if (perfReady && i === 0) {
+              this._log('[bench] Client perf bridge ready');
+            }
+
+            if (this._options.cpuThrottle > 1) {
+              this._log(`[bench] Applying startup CPU throttle: ${this._options.cpuThrottle}x to client ${i + 1}/${clientCount}`);
+              await client.setCpuThrottle(this._options.cpuThrottle);
+            }
           }
         } catch (err: any) {
           this._log(`[bench] WARNING: Headless client failed to launch: ${err?.message ?? err}`);
-          this._headlessClient = null;
+          await this._closeHeadlessClients();
         }
       }
 
@@ -297,7 +300,7 @@ export default class BenchmarkRunner {
             await this._disconnectWsClients(action.count);
             break;
           case 'wait_for_entities':
-            if (this._headlessClient) {
+            if (this._primaryHeadlessClient) {
               const minEntities = action.count ?? 1;
               const timeout = action.durationMs ?? 30000;
 
@@ -306,7 +309,7 @@ export default class BenchmarkRunner {
               const start = Date.now();
 
               while (Date.now() - start < timeout) {
-                const snap = await this._headlessClient.collectClientMetrics();
+                const snap = await this._primaryHeadlessClient.collectClientMetrics();
 
                 if (snap?.entities && snap.entities.count >= minEntities) {
                   this._log(`[bench]   Got ${snap.entities.count} entities`);
@@ -318,58 +321,62 @@ export default class BenchmarkRunner {
             }
             break;
           case 'walk_player':
-            if (this._headlessClient) {
+            if (this._headlessClients.length > 0) {
               const key = (action.options?.key as string) ?? 'w';
               const dur = action.durationMs ?? 3000;
 
-              this._log(`[bench]   Walking player: key=${key} for ${dur}ms`);
+              this._log(`[bench]   Walking player(s): target=${action.target ?? 'primary'} key=${key} for ${dur}ms`);
 
               try {
-                await this._headlessClient.sendMovement(key, dur);
+                await this._runOnHeadlessClients(action, client => client.sendMovement(key, dur));
               } catch {
                 this._log('[bench]   walk_player: input failed (non-fatal)');
               }
             }
             break;
           case 'set_camera':
-            if (this._headlessClient) {
+            if (this._headlessClients.length > 0) {
               const yaw = action.yaw ?? 0;
               const pitch = action.pitch ?? -0.3;
 
-              this._log(`[bench]   Setting camera: yaw=${yaw} pitch=${pitch}`);
+              this._log(`[bench]   Setting camera(s): target=${action.target ?? 'primary'} yaw=${yaw} pitch=${pitch}`);
 
               try {
-                if (action.position) {
-                  await this._headlessClient.setCameraPosition(action.position.x, action.position.y, action.position.z);
-                }
+                await this._runOnHeadlessClients(action, async client => {
+                  if (action.position) {
+                    await client.setCameraPosition(action.position.x, action.position.y, action.position.z);
+                  }
 
-                await this._headlessClient.lookAt(yaw, pitch);
-                await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+                  await client.lookAt(yaw, pitch);
+                  await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+                });
               } catch {
                 this._log('[bench]   set_camera: failed (non-fatal)');
               }
             }
             break;
           case 'throttle_cpu':
-            if (this._headlessClient) {
+            if (this._headlessClients.length > 0) {
               const rate = action.rate ?? 1;
 
-              this._log(`[bench]   CPU throttle: ${rate}x`);
+              this._log(`[bench]   CPU throttle: target=${action.target ?? 'primary'} ${rate}x`);
 
               try {
-                await this._headlessClient.setCpuThrottle(rate);
+                await this._runOnHeadlessClients(action, client => client.setCpuThrottle(rate));
               } catch {
                 this._log('[bench]   throttle_cpu: failed (non-fatal)');
               }
             }
             break;
           case 'send_chat':
-            if (this._headlessClient && action.message) {
-              this._log(`[bench]   Sending chat: ${action.message}`);
+            if (this._headlessClients.length > 0 && action.message) {
+              this._log(`[bench]   Sending chat: target=${action.target ?? 'primary'} ${action.message}`);
 
               try {
-                await this._headlessClient.sendChatMessage(action.message);
-                await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+                await this._runOnHeadlessClients(action, async client => {
+                  await client.sendChatMessage(action.message!);
+                  await new Promise(r => setTimeout(r, action.durationMs ?? 500));
+                });
               } catch {
                 this._log('[bench]   send_chat: failed (non-fatal)');
               }
@@ -419,9 +426,9 @@ export default class BenchmarkRunner {
         }
       }
 
-      if (this._headlessClient?.isConnected) {
+      if (this._primaryHeadlessClient?.isConnected) {
         try {
-          const clientSnapshot = await this._headlessClient.collectClientMetrics();
+          const clientSnapshot = await this._primaryHeadlessClient.collectClientMetrics();
 
           if (clientSnapshot) {
             this._collector.addClientSnapshot(clientSnapshot);
@@ -542,11 +549,53 @@ export default class BenchmarkRunner {
     }
   }
 
-  private async _cleanup(): Promise<void> {
-    if (this._headlessClient) {
-      await this._headlessClient.close();
-      this._headlessClient = null;
+  private get _primaryHeadlessClient(): HeadlessClient | null {
+    return this._headlessClients[0] ?? null;
+  }
+
+  private _getTargetHeadlessClients(target: ScenarioClientTarget | undefined): HeadlessClient[] {
+    switch (target) {
+      case 'all':
+        return [...this._headlessClients];
+      case 'extras':
+        return this._headlessClients.slice(1);
+      case 'primary':
+      default:
+        return this._headlessClients.slice(0, 1);
     }
+  }
+
+  private async _runOnHeadlessClients(
+    action: Pick<ScenarioAction, 'target' | 'staggerMs'>,
+    run: (client: HeadlessClient, index: number) => Promise<void>,
+  ): Promise<void> {
+    const clients = this._getTargetHeadlessClients(action.target);
+
+    if (clients.length === 0) {
+      return;
+    }
+
+    const delayMs = typeof action.staggerMs === 'number' ? Math.max(0, Math.floor(action.staggerMs)) : 0;
+
+    await Promise.all(clients.map(async (client, index) => {
+      if (delayMs > 0 && index > 0) {
+        await this._wait(delayMs * index);
+      }
+
+      await run(client, index);
+    }));
+  }
+
+  private async _closeHeadlessClients(): Promise<void> {
+    for (const client of this._headlessClients) {
+      await client.close();
+    }
+
+    this._headlessClients = [];
+  }
+
+  private async _cleanup(): Promise<void> {
+    await this._closeHeadlessClients();
 
     for (const client of this._wsClients) {
       await client.close();

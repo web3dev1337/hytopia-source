@@ -1,5 +1,6 @@
 name: "zoo-game-observe"
-description: "Zoo Game observation run: /fillzoo, 5 moving perf bots near the zoo entrance, plus the benchmark walkthrough client"
+description: "Zoo Game observation run: 5 real benchmark clients join, each /fillzoo their own zoo, then move during a long measured phase"
+browserClients: 5
 warmupMs: 5000
 phases:
   - name: setup-zoo
@@ -8,10 +9,8 @@ phases:
       - type: send_chat
         message: "/fillzoo"
         durationMs: 3000
-      - type: spawn_bots
-        count: 5
-        behavior: random_walk
-        origin: { x: 0, y: 2, z: 25 }
+        target: all
+        staggerMs: 750
   - name: wait-for-world
     actions:
       - type: wait_for_entities
@@ -27,37 +26,57 @@ phases:
         yaw: 0
         pitch: 0.3
         durationMs: 500
+        target: all
+        staggerMs: 500
       - type: walk_player
         durationMs: 5000
         options: { key: w }
+        target: all
+        staggerMs: 500
       - type: set_camera
         yaw: -1.57
         pitch: 0.3
         durationMs: 300
+        target: all
+        staggerMs: 500
       - type: walk_player
         durationMs: 4000
         options: { key: w }
+        target: all
+        staggerMs: 500
       - type: set_camera
         yaw: 3.14
         pitch: 0.3
         durationMs: 300
+        target: all
+        staggerMs: 500
       - type: walk_player
         durationMs: 5000
         options: { key: w }
+        target: all
+        staggerMs: 500
       - type: set_camera
         yaw: 1.57
         pitch: 0.3
         durationMs: 300
+        target: all
+        staggerMs: 500
       - type: walk_player
         durationMs: 4000
         options: { key: w }
+        target: all
+        staggerMs: 500
       - type: set_camera
         yaw: 0
         pitch: 0.3
         durationMs: 300
+        target: all
+        staggerMs: 500
       - type: walk_player
         durationMs: 5000
         options: { key: w }
+        target: all
+        staggerMs: 500
 thresholds:
   tick_duration_ms:
     avg: 16
