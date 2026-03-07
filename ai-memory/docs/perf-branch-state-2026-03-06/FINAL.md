@@ -136,11 +136,13 @@ Core files:
 
 - [link-sdk.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/link-sdk.sh)
 - [setup-game.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/setup-game.sh)
+- [run-external-game-benchmark.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/run-external-game-benchmark.sh)
 
 What these do:
 
 - build the local SDK from this repo
 - link it into external game repos
+- run a real-game preset end-to-end against an external game using the current source checkout under test
 - let HyFire2 or Zoo Game run against local engine changes
 
 Important clarification:
