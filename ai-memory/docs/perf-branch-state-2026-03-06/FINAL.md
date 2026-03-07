@@ -19,6 +19,12 @@ What happened after that is also clear:
 - the branch then got mixed with a local blob-shadow investigation
 - this cleanup separates those concerns again
 
+Follow-up update from local real-game verification:
+
+- joinable external-game runs exposed a local-dev crash path where sessionless local players still attempted live platform cosmetics lookup
+- that engine-side issue is now fixed in [PlatformGateway.ts](/home/ab/GitHub/hytopia/work1/server/src/networking/PlatformGateway.ts) and [Player.ts](/home/ab/GitHub/hytopia/work1/server/src/players/Player.ts)
+- result: local HyFire2 observation runs no longer fall over on human join just because the production GraphQL cosmetics websocket rejects the request
+
 After this cleanup, the branch should be understood as:
 
 - **permanent framework code** kept
@@ -235,6 +241,12 @@ This cleanup retains the broadly reusable framework improvements that were still
 
 These are deliberate framework improvements, not feature-under-test patches.
 
+There is also one engine stability fix that came out of the real-game validation itself:
+
+- local sessionless dev players no longer trigger live platform cosmetics fetches on join
+- `PlatformGateway` now skips GraphQL cosmetics access when the platform gateway is unavailable in local development
+- `Player` now only requests cosmetics for real platform-backed sessions
+
 ## What This Cleanup Removed
 
 ### Removed from the Working Tree
@@ -318,7 +330,7 @@ The answer should now be **yes**:
 2. CI is still centered on lightweight built-in scenarios rather than full game walkthroughs.
 3. HyFire2/Zoo Game benchmarking still depends on local setup and linked SDK flows.
 4. Some external-game compatibility fixes belong in the game repos, not here. HyFire2 now needs its own latest-SDK compatibility patch set for removed server light APIs, controller setup changes, animation-stop API changes, and one bad `SiteMarker` asset path.
-5. The branch still needs a clean final commit/PR state to lock this cleanup in.
+5. Observation-mode external-game runs are now stable for local human joins, but extreme low-end throttled browser clients can still churn or reconnect under heavy load.
 
 ## Read This First Tomorrow
 

@@ -102,16 +102,15 @@ export default class PlatformGateway {
   public readonly lobbyId: string | undefined = process.env.HYTOPIA_LOBBY_ID;
 
   private _creativeGateway: CreativeGateway | undefined;
-  private _gqlWs: graphQLWS.Client;
+  private _gqlWs: graphQLWS.Client | undefined;
 
   private constructor() {
-    this._gqlWs = graphQLWS.createClient({
-      url: 'wss://prod.gql.hytopia.com/graphql',
-      webSocketImpl: WebSocket,
-    });
-
     try {
       this._creativeGateway = new CreativeGateway();
+      this._gqlWs = graphQLWS.createClient({
+        url: 'wss://prod.gql.hytopia.com/graphql',
+        webSocketImpl: WebSocket,
+      });
     } catch {
       console.warn([
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
@@ -196,6 +195,10 @@ export default class PlatformGateway {
    * **Category:** Networking
    */
   public async getPlayerCosmetics(userId: string): Promise<PlayerCosmetics | void> {
+    if (!this._creativeGateway || !this._gqlWs) {
+      return;
+    }
+
     const iterator = this._gqlWs.iterate<PlayerCosmeticsGqlUserById, { id: string }>({
       query: `{
         userById(id: "${userId}") {
