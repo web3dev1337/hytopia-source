@@ -3,6 +3,9 @@
 # Links our modified SDK into a game directory
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
 if [ -z "$1" ]; then
   echo "Usage: $0 <game-dir>"
   echo "Examples:"
@@ -20,7 +23,28 @@ fi
 
 echo "Linking hytopia SDK into $GAME_DIR ..."
 cd "$GAME_DIR"
+
 npm link hytopia
+
+for SDK_RUNTIME_DEP in \
+  "@fails-components/webtransport" \
+  "@fails-components/webtransport-transport-http3-quiche"
+do
+  SDK_RUNTIME_SOURCE="$REPO_ROOT/node_modules/$SDK_RUNTIME_DEP"
+
+  if [ ! -e "$SDK_RUNTIME_SOURCE" ]; then
+    SDK_RUNTIME_SOURCE="$REPO_ROOT/server/node_modules/$SDK_RUNTIME_DEP"
+  fi
+
+  if [ ! -e "$SDK_RUNTIME_SOURCE" ]; then
+    echo "Error: runtime dependency $SDK_RUNTIME_DEP is missing from local SDK workspace"
+    exit 1
+  fi
+
+  mkdir -p "$GAME_DIR/node_modules/$(dirname "$SDK_RUNTIME_DEP")"
+  rm -rf "$GAME_DIR/node_modules/$SDK_RUNTIME_DEP"
+  ln -s "$SDK_RUNTIME_SOURCE" "$GAME_DIR/node_modules/$SDK_RUNTIME_DEP"
+done
 
 SDK_VERSION=$(node - <<'NODE'
 const fs = require('node:fs');

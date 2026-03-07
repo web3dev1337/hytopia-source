@@ -141,7 +141,7 @@ Core files:
 What these do:
 
 - build the local SDK from this repo
-- link it into external game repos
+- link it into external game repos and install the linked SDK's external runtime deps
 - run a real-game preset end-to-end against an external game using the current source checkout under test
 - let HyFire2 or Zoo Game run against local engine changes
 
@@ -317,7 +317,8 @@ The answer should now be **yes**:
 1. Full external-game benchmarking is still more manual than synthetic presets.
 2. CI is still centered on lightweight built-in scenarios rather than full game walkthroughs.
 3. HyFire2/Zoo Game benchmarking still depends on local setup and linked SDK flows.
-4. The branch still needs a clean final commit/PR state to lock this cleanup in.
+4. Some external-game compatibility fixes belong in the game repos, not here. HyFire2 now needs its own latest-SDK compatibility patch set for removed server light APIs, controller setup changes, animation-stop API changes, and one bad `SiteMarker` asset path.
+5. The branch still needs a clean final commit/PR state to lock this cleanup in.
 
 ## Read This First Tomorrow
 
