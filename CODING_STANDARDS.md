@@ -400,9 +400,114 @@ public joinWorld(world: World) {
 
 ---
 
-## 6. Architecture Patterns
+## 6. Code Clarity
 
-### 6.1 Singleton Pattern
+Prefer code that explains itself over code that needs comments to explain it.
+
+### 6.1 Extract Method Over Comments
+
+If a comment explains *what* a block does, extract it into a method whose name says the same thing.
+
+```typescript
+// DON'T: Comment as section header
+public joinWorld(world: World) {
+  // Check if player is allowed to join
+  if (!world.isStarted || world.isFull() || !this._isAuthenticated) {
+    return;
+  }
+
+  // Remove from current world
+  if (this._world) {
+    this._world.entityManager.unregister(this._entity);
+    this._world = undefined;
+  }
+
+  // Add to new world
+  world.entityManager.register(this._entity);
+  this._world = world;
+}
+
+// DO: Method names are the documentation
+public joinWorld(world: World) {
+  if (!this._canJoinWorld(world)) return;
+  this._leaveCurrentWorld();
+  this._enterWorld(world);
+}
+```
+
+### 6.2 Explanatory Variables
+
+Break complex expressions into named intermediates. The variable name documents the intent.
+
+```typescript
+// DON'T: Dense expression
+if (entity.position.distanceToSquared(player.position) < RANGE_SQ
+    && entity.health > 0 && !entity.isEnvironmental) {
+
+// DO: Named conditions
+const isInRange = entity.position.distanceToSquared(player.position) < RANGE_SQ;
+const isAlive = entity.health > 0;
+const isInteractable = !entity.isEnvironmental;
+if (isInRange && isAlive && isInteractable) {
+```
+
+### 6.3 Introduce Parameter Object
+
+When 3+ parameters travel together, group them into an interface.
+
+```typescript
+// DON'T
+function spawnEntity(x: number, y: number, z: number, rx: number, ry: number, rz: number) { }
+
+// DO
+function spawnEntity(options: EntitySpawnOptions) { }
+```
+
+This is already the codebase convention (see 7.4 Options Object Pattern) — apply it consistently.
+
+### 6.4 Replace Nested Conditionals with Guard Clauses
+
+```typescript
+// DON'T: Nested logic
+public processPacket(packet: Packet) {
+  if (packet) {
+    if (packet.isValid()) {
+      if (this._isConnected) {
+        // ... actual logic buried 3 levels deep
+      }
+    }
+  }
+}
+
+// DO: Guard clauses, then logic
+public processPacket(packet: Packet) {
+  if (!packet) return;
+  if (!packet.isValid()) return ErrorHandler.warning('...');
+  if (!this._isConnected) return;
+  // ... actual logic at top level
+}
+```
+
+### 6.5 When Comments Are Appropriate
+
+Comments explain *why*, never *what*. Good uses:
+
+```typescript
+// Rapier requires bodies to be removed before the world steps
+this._bodiesToRemove.forEach(body => this._rapierWorld.removeRigidBody(body));
+
+// Wire format uses 1-char keys to minimize packet size
+export type EntitySchema = { i: number; p?: VectorSchema; }
+
+// Intentionally no-op: base class hook for subclasses to override
+public onTick(deltaMs: number): void { }
+```
+
+---
+
+## 7. Architecture Patterns
+
+### 7.1 Singleton Pattern
 
 Two approved variants. Note: the codebase is singleton-heavy (DIP score: 4/10). New code should prefer constructor injection where practical. If you must use a singleton, define an interface for the dependency.
 
@@ -422,7 +527,7 @@ public static readonly instance: PlayerManager = new PlayerManager();
 private constructor() { ... }
 ```
 
-### 6.2 EventRouter Pattern
+### 7.2 EventRouter Pattern
 
 Every significant class extends `EventRouter` and follows the event declaration template:
 
@@ -445,7 +550,7 @@ export default class Xxx extends EventRouter<XxxEventPayloads> {
 - `emitWithGlobal()` — local + global singleton (for cross-world events)
 - `emitWithWorld()` — local + world EventRouter (for NetworkSynchronizer to observe)
 
-### 6.3 Controller/Strategy Pattern
+### 7.3 Controller/Strategy Pattern
 
 Entity behavior is delegated via composition, not inheritance:
 
@@ -460,7 +565,7 @@ class SwimmingEntity extends Entity { ... }
 Controllers extend `BaseEntityController` and implement lifecycle hooks:
 `attach()` → `spawn()` → `tick()` / `tickWithPlayerInput()` → `despawn()` → `detach()`
 
-### 6.4 Options Object Pattern
+### 7.4 Options Object Pattern
 
 Configuration via single options parameter with optional fields and defaults:
 
@@ -479,7 +584,7 @@ constructor(options: WorldOptions) {
 }
 ```
 
-### 6.5 Composition Over Inheritance
+### 7.5 Composition Over Inheritance
 
 ```typescript
 // DO: Composition
@@ -491,7 +596,7 @@ this._simulation = new Simulation(this, options.tickRate, options.gravity);
 class World extends AudioCapable extends EntityCapable extends PhysicsCapable { }
 ```
 
-### 6.6 Protocol Schema Pattern
+### 7.6 Protocol Schema Pattern
 
 Co-located TypeScript type + JSON Schema with extreme key minification:
 
@@ -518,7 +623,7 @@ export const entitySchema: JSONSchemaType<EntitySchema> = {
 
 ---
 
-## 7. Formatting Rules
+## 8. Formatting Rules
 
 ### ESLint-Enforced
 
@@ -557,11 +662,11 @@ export const entitySchema: JSONSchemaType<EntitySchema> = {
 
 ---
 
-## 8. Performance Patterns
+## 9. Performance Patterns
 
 New code in hot paths must follow these established patterns.
 
-### 8.1 Pre-allocated Working Variables
+### 9.1 Pre-allocated Working Variables
 
 ```typescript
 // DO: module-level working variables
@@ -582,7 +687,7 @@ class Entity {
 }
 ```
 
-### 8.2 Manual Matrix Management
+### 9.2 Manual Matrix Management
 
 ```typescript
 object.matrixAutoUpdate = false;
@@ -592,7 +697,7 @@ object.updateMatrix();
 object.updateMatrixWorld();
 ```
 
-### 8.3 Packed Numeric Keys for Map Lookups
+### 9.3 Packed Numeric Keys for Map Lookups
 
 ```typescript
 // DO
@@ -602,7 +707,7 @@ const key = (x << 20) | (y << 10) | z;  // packed numeric key
 const key = `${x},${y},${z}`;  // string allocation every lookup
 ```
 
-### 8.4 Update Thresholds
+### 9.4 Update Thresholds
 
 ```typescript
 const POSITION_THRESHOLD_SQ = 0.04 * 0.04;
@@ -613,13 +718,13 @@ if (positionDeltaSq > POSITION_THRESHOLD_SQ) {
 }
 ```
 
-### 8.5 Environmental Entity Optimization
+### 9.5 Environmental Entity Optimization
 
 Static world objects (`isEnvironmental = true`) skip per-tick updates entirely. Use this flag for non-interactive decoration.
 
 ---
 
-## 9. Client vs Server Differences
+## 10. Client vs Server Differences
 
 New code must follow the conventions of the layer it's in.
 
@@ -634,7 +739,7 @@ New code must follow the conventions of the layer it's in.
 
 ---
 
-## 10. Known Improvement Areas
+## 11. Known Improvement Areas
 
 Documented weaknesses. New code should not make them worse. Improvements are welcome.
 
@@ -657,7 +762,7 @@ Documented weaknesses. New code should not make them worse. Improvements are wel
 
 ---
 
-## 11. Code Review Checklist
+## 12. Code Review Checklist
 
 ### Naming & Style
 - [ ] Classes: PascalCase + approved role suffix
@@ -693,6 +798,13 @@ Documented weaknesses. New code should not make them worse. Improvements are wel
 - [ ] No empty catch blocks
 - [ ] No `console.log`
 
+### Code Clarity
+- [ ] No comments explaining *what* — extract method instead
+- [ ] Complex conditions use explanatory variables
+- [ ] No nesting deeper than 2 levels — use guard clauses
+- [ ] 3+ params that travel together → parameter object
+- [ ] Comments explain *why*, not *what*
+
 ### Architecture
 - [ ] Event listeners paired with cleanup
 - [ ] No monkey-patching
@@ -726,7 +838,7 @@ Documented weaknesses. New code should not make them worse. Improvements are wel
 
 ---
 
-## 12. ESLint Configuration Reference
+## 13. ESLint Configuration Reference
 
 ```javascript
 'indent': ['error', 2, { SwitchCase: 1 }],
