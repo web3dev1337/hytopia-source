@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { loadScenario } from './runners/ScenarioLoader.js';
 import BenchmarkRunner from './runners/BenchmarkRunner.js';
 import BaselineComparer from './runners/BaselineComparer.js';
+import BenchmarkSeriesAggregator from './runners/BenchmarkSeriesAggregator.js';
 import ConsoleReporter from './reporters/ConsoleReporter.js';
 import JsonReporter from './reporters/JsonReporter.js';
 
@@ -113,6 +114,23 @@ program
   });
 
 program
+  .command('aggregate')
+  .description('Aggregate repeated benchmark JSONs into a median report')
+  .argument('<reports...>', 'Benchmark report JSON files to aggregate')
+  .requiredOption('--output <path>', 'Write the aggregated report to JSON file')
+  .action((reportPaths, options) => {
+    const aggregator = new BenchmarkSeriesAggregator();
+    const outputPath = options.output;
+    const absoluteOutputPath = path.isAbsolute(outputPath) ? outputPath : path.resolve(process.cwd(), outputPath);
+    const report = aggregator.aggregateFiles(reportPaths);
+
+    fs.mkdirSync(path.dirname(absoluteOutputPath), { recursive: true });
+    fs.writeFileSync(absoluteOutputPath, JSON.stringify(report, null, 2), 'utf-8');
+
+    console.log(`Aggregated ${reportPaths.length} reports into: ${absoluteOutputPath}`);
+  });
+
+program
   .command('compare')
   .description('Compare two baseline files')
   .argument('<before>', 'Path to baseline (before) JSON')
@@ -202,6 +220,84 @@ program
   });
 
 program
+  .command('compare-series')
+  .description('Compare two repeated benchmark sets using median aggregation')
+  .requiredOption('--before <paths>', 'Comma-separated list of baseline report JSON files')
+  .requiredOption('--after <paths>', 'Comma-separated list of candidate report JSON files')
+  .option('--warn <pct>', 'Warning threshold percentage', '5')
+  .option('--fail <pct>', 'Failure threshold percentage', '15')
+  .option('--fail-on-regression', 'Exit with code 1 if the aggregate verdict regresses')
+  .action((options) => {
+    const beforePaths = splitPathList(options.before);
+    const afterPaths = splitPathList(options.after);
+    const aggregator = new BenchmarkSeriesAggregator();
+    const beforeAggregate = aggregator.aggregateFiles(beforePaths);
+    const afterAggregate = aggregator.aggregateFiles(afterPaths);
+    const comparer = new BaselineComparer({
+      warningThresholdPct: parseFloat(options.warn),
+      failThresholdPct: parseFloat(options.fail),
+    });
+    const includeServerMetrics = hasServerMetrics(beforeAggregate) && hasServerMetrics(afterAggregate);
+    const usesLegacyServerMetrics = reportUsesLegacyServerMetrics(beforeAggregate) || reportUsesLegacyServerMetrics(afterAggregate);
+    const includeClientMetrics = hasClientMetrics(beforeAggregate) && hasClientMetrics(afterAggregate);
+    const includeClientRenderMetrics = includeClientMetrics && hasClientRenderMetrics(beforeAggregate) && hasClientRenderMetrics(afterAggregate);
+    const includeServerTailMetrics = includeServerMetrics && !usesLegacyServerMetrics;
+    const includeServerBudgetMetrics = includeServerMetrics && !usesLegacyServerMetrics;
+    const includeServerNetworkMetrics = includeServerMetrics && !usesLegacyServerMetrics
+      && beforeAggregate.baseline.network !== undefined
+      && afterAggregate.baseline.network !== undefined;
+
+    if (!includeServerMetrics && !includeClientMetrics) {
+      console.error('Cannot compare these report series because they do not share any comparable metric categories.');
+      process.exit(1);
+    }
+
+    if (!includeServerMetrics) {
+      console.log('Skipping server metrics: one or both report series lack server snapshots.');
+    } else if (usesLegacyServerMetrics) {
+      console.log('Skipping server p99, budget, and network metrics: one or both report series used the legacy server perf API.');
+    }
+
+    if (!includeClientMetrics) {
+      console.log('Skipping client metrics: one or both report series lack client snapshots.');
+    } else if (!includeClientRenderMetrics) {
+      console.log('Skipping client draw-call and triangle metrics: one or both report series lack usable render counters.');
+    }
+
+    const comparison = comparer.compare(
+      beforeAggregate.baseline,
+      afterAggregate.baseline,
+      `${beforePaths.length}x before vs ${afterPaths.length}x after`,
+      {
+        includeServerMetrics,
+        includeServerTailMetrics,
+        includeServerBudgetMetrics,
+        includeServerNetworkMetrics,
+        includeClientMetrics,
+        includeClientRenderMetrics,
+      },
+    );
+    const summary = aggregator.classifyComparison(comparison);
+    const reporter = new ConsoleReporter();
+
+    reporter.reportComparison(comparison);
+    console.log(`Series verdict: ${summary.verdict.toUpperCase()}`);
+
+    if (summary.keyEntries.length > 0) {
+      console.log('Key metrics:');
+      for (const entry of summary.keyEntries) {
+        const change = entry.changePct > 0 ? `+${entry.changePct.toFixed(1)}%` : `${entry.changePct.toFixed(1)}%`;
+        console.log(`  ${entry.metric}: ${entry.baseline.toFixed(2)} -> ${entry.current.toFixed(2)} (${change})`);
+      }
+      console.log('');
+    }
+
+    if (options.failOnRegression && summary.verdict === 'regresses') {
+      process.exitCode = 1;
+    }
+  });
+
+program
   .command('presets')
   .description('List available built-in presets')
   .action(() => {
@@ -253,4 +349,12 @@ function hasClientRenderMetrics(input: ReturnType<typeof BaselineComparer.loadIn
   }
 
   return client.avgDrawCalls > 0 || client.maxDrawCalls > 0 || client.avgTriangles > 0 || client.maxTriangles > 0;
+}
+
+function splitPathList(value: string): string[] {
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(item => item.length > 0)
+    .map(item => path.isAbsolute(item) ? item : path.resolve(process.cwd(), item));
 }

@@ -72,6 +72,8 @@ export interface ComparisonScope {
 export interface LoadedBenchmarkInput {
   baseline: BaselineResult;
   metrics?: {
+    tickReportCount?: number;
+    spikeCount?: number;
     serverSnapshotCount?: number;
     clientSnapshotCount?: number;
   };
@@ -81,7 +83,9 @@ export interface LoadedBenchmarkInput {
     issues?: string[];
   };
   capabilities?: {
+    serverMetrics?: boolean;
     serverMetricSources?: string[];
+    clientMetrics?: boolean;
     clientMetricSources?: string[];
   };
 }

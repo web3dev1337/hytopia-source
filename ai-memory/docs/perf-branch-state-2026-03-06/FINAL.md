@@ -79,6 +79,7 @@ Core files:
 
 - [cli.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/cli.ts)
 - [BenchmarkRunner.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkRunner.ts)
+- [BenchmarkSeriesAggregator.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkSeriesAggregator.ts)
 - [MetricCollector.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/MetricCollector.ts)
 - [ProcessMonitor.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ProcessMonitor.ts)
 - [ServerApiClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ServerApiClient.ts)
@@ -91,6 +92,8 @@ Capabilities:
 - scenario-based benchmark execution
 - JSON report output
 - baseline comparisons
+- repeated-run median aggregation
+- series comparison verdicts for noisy scenarios
 - regression thresholds
 - OS-level process monitoring
 - log capture
@@ -164,13 +167,17 @@ Cross-ref hardening added after testing `RZDESIGN/hytopia-source@merged-all-prs-
 - `run-owned-stack-suite.sh` now resolves `--engine-ref pr:<n>` and other fetched refs through `origin` first and then `upstream`, so upstream PRs can be benchmarked directly from this fork checkout
 - benchmark JSON now records validation/capability state so missing snapshots are surfaced as warnings/issues instead of silently becoming zero baselines
 - `compare` now skips non-shared metric families such as server snapshots or render counters when one side lacks them, instead of treating missing data as an improvement
+- `hytopia-bench aggregate` can combine repeated benchmark JSONs into a single median report, preserving validation/capability metadata and the source file list
+- `hytopia-bench compare-series` compares two repeated benchmark sets via median aggregation and emits a simple series verdict (`improves`, `neutral`, `regresses`, `inconclusive`) based on the core metrics
+- `run-owned-stack-suite.sh --repeat <n>` now runs each scenario multiple times, stores the per-run JSON under `repeats/<scenario>/`, and writes a median aggregate to the stable top-level scenario path used by follow-up compare commands
 
 The simplest “test this engine PR across our stack” entrypoint is now:
 
 ```bash
 bash packages/perf-tools/scripts/run-owned-stack-suite.sh \
   --engine-ref pr:2 \
-  --client-url http://localhost:4173
+  --client-url http://localhost:4173 \
+  --repeat 3
 ```
 
 That wrapper can:

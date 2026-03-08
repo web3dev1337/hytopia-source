@@ -11,6 +11,7 @@ ENGINE_REF=""
 CLIENT_URL=""
 CLIENT_PORT="4173"
 CPU_THROTTLE=""
+REPEAT_COUNT="1"
 OUTPUT_ROOT="$REPO_ROOT/packages/perf-tools/perf-results/owned-stack"
 INTERNAL_PRESETS="idle,stress,stress-walkthrough"
 EXTERNAL_GAMES="zoo,hyfire2"
@@ -49,6 +50,7 @@ Options:
   --client-url <url>         Browser client URL for all client-side runs
   --client-port <port>       Port to use when auto-launching client dev server
   --cpu-throttle <rate>      Browser CPU throttle rate for client runs
+  --repeat <count>           Run each scenario N times and aggregate via median
   --output-root <path>       Root directory for suite outputs
   --internal-presets <list>  Comma-separated built-in presets, or none
   --external-games <list>    Comma-separated games: zoo,hyfire2, or none
@@ -70,6 +72,7 @@ Examples:
 
   bash packages/perf-tools/scripts/run-owned-stack-suite.sh \
     --engine-ref feature/blob-shadows \
+    --repeat 3 \
     --cpu-throttle 4 \
     --output-root /tmp/hytopia-bench
 
@@ -151,6 +154,10 @@ while [[ $# -gt 0 ]]; do
       CPU_THROTTLE="$2"
       shift 2
       ;;
+    --repeat)
+      REPEAT_COUNT="$2"
+      shift 2
+      ;;
     --output-root)
       OUTPUT_ROOT="$2"
       shift 2
@@ -210,6 +217,11 @@ done
 
 if [[ ! -d "$ENGINE_REPO/.git" && ! -f "$ENGINE_REPO/.git" ]]; then
   echo "Error: $ENGINE_REPO is not a git repo" >&2
+  exit 1
+fi
+
+if ! [[ "$REPEAT_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: --repeat must be a positive integer" >&2
   exit 1
 fi
 
@@ -334,11 +346,19 @@ resolve_engine_checkout() {
   ACTIVE_ENGINE_REPO="$WORKTREE_DIR"
 }
 
-run_and_capture() {
+record_summary_row() {
   local label="$1"
   local category="$2"
-  local output_path="$3"
-  shift 3
+  local status="$3"
+  local output="$4"
+
+  SUMMARY_ROWS+=("| $label | $category | $status | $output |")
+}
+
+run_command() {
+  local label="$1"
+  local output_path="$2"
+  shift 2
 
   echo ""
   echo "==> Running $label"
@@ -349,13 +369,134 @@ run_and_capture() {
   local status=$?
   set -e
 
-  SUMMARY_ROWS+=("| $label | $category | $status | $output_path |")
-
   if [[ $status -ne 0 ]]; then
     echo "WARNING: $label failed with exit code $status" >&2
   fi
 
   return $status
+}
+
+aggregate_reports() {
+  local output_path="$1"
+  shift
+
+  (
+    cd "$TOOLS_REPO/packages/perf-tools"
+    npx tsx src/cli.ts aggregate --output "$output_path" "$@"
+  )
+}
+
+run_internal_preset() {
+  local preset="$1"
+  local output_path="$OUTPUT_DIR/${preset}.json"
+  local repeat_dir="$OUTPUT_DIR/repeats/${preset}"
+  local repeat_output
+  local -a repeat_outputs=()
+  local status=0
+  local repeat_index
+
+  if (( REPEAT_COUNT <= 1 )); then
+    local -a cmd=(
+      npx tsx src/cli.ts run
+      --preset "$preset"
+      --server-cwd "$ACTIVE_ENGINE_REPO/server"
+      --with-client
+      --client-dev-url "$CLIENT_URL"
+      --output "$output_path"
+    )
+
+    if [[ -n "$CPU_THROTTLE" ]]; then
+      cmd+=(--cpu-throttle "$CPU_THROTTLE")
+    fi
+
+    if run_command "$preset" "$output_path" bash -lc "cd '$TOOLS_REPO/packages/perf-tools' && ${cmd[*]@Q}"; then
+      record_summary_row "$preset" "internal" "0" "$output_path"
+      return 0
+    fi
+
+    record_summary_row "$preset" "internal" "1" "$output_path"
+    return 1
+  fi
+
+  mkdir -p "$repeat_dir"
+
+  for repeat_index in $(seq 1 "$REPEAT_COUNT"); do
+    repeat_output="$repeat_dir/run-$repeat_index.json"
+    repeat_outputs+=("$repeat_output")
+
+    local -a repeat_cmd=(
+      npx tsx src/cli.ts run
+      --preset "$preset"
+      --server-cwd "$ACTIVE_ENGINE_REPO/server"
+      --with-client
+      --client-dev-url "$CLIENT_URL"
+      --output "$repeat_output"
+    )
+
+    if [[ -n "$CPU_THROTTLE" ]]; then
+      repeat_cmd+=(--cpu-throttle "$CPU_THROTTLE")
+    fi
+
+    if ! run_command "$preset (run $repeat_index/$REPEAT_COUNT)" "$repeat_output" bash -lc "cd '$TOOLS_REPO/packages/perf-tools' && ${repeat_cmd[*]@Q}"; then
+      status=1
+    fi
+  done
+
+  if [[ $status -eq 0 ]]; then
+    echo ""
+    echo "==> Aggregating $preset repeats into $output_path"
+    if ! aggregate_reports "$output_path" "${repeat_outputs[@]}"; then
+      status=1
+    fi
+  fi
+
+  record_summary_row "$preset" "internal" "$status" "$output_path (median of $REPEAT_COUNT runs)"
+  return "$status"
+}
+
+run_external_game_preset() {
+  local label="$1"
+  local preset="$2"
+  local output_name="$3"
+  shift 3
+  local output_path="$OUTPUT_DIR/${output_name}.json"
+  local repeat_dir="$OUTPUT_DIR/repeats/${output_name}"
+  local repeat_output
+  local -a repeat_outputs=()
+  local status=0
+  local repeat_index
+
+  if (( REPEAT_COUNT <= 1 )); then
+    if run_command "$label" "$output_path" "$@" --output "$output_path"; then
+      record_summary_row "$label" "external" "0" "$output_path"
+      return 0
+    fi
+
+    record_summary_row "$label" "external" "1" "$output_path"
+    return 1
+  fi
+
+  mkdir -p "$repeat_dir"
+
+  for repeat_index in $(seq 1 "$REPEAT_COUNT"); do
+    repeat_output="$repeat_dir/run-$repeat_index.json"
+    repeat_outputs+=("$repeat_output")
+
+    if ! run_command "$label (run $repeat_index/$REPEAT_COUNT)" "$repeat_output" "$@" --output "$repeat_output"; then
+      status=1
+    fi
+  done
+
+  if [[ $status -eq 0 ]]; then
+    echo ""
+    echo "==> Aggregating $label repeats into $output_path"
+    if ! aggregate_reports "$output_path" "${repeat_outputs[@]}"; then
+      status=1
+    fi
+  fi
+
+  record_summary_row "$label" "external" "$status" "$output_path (median of $REPEAT_COUNT runs)"
+  return "$status"
 }
 
 write_summary() {
@@ -373,6 +514,7 @@ write_summary() {
 - Resolved commit: \`$RESOLVED_COMMIT\`
 - Client URL: \`$CLIENT_URL\`
 - CPU throttle: \`${CPU_THROTTLE:-none}\`
+- Repeat count: \`$REPEAT_COUNT\`
 - Instrumentation overlay: \`${INSTRUMENTATION_OVERLAY}\`
 - Overlay manifest: \`${OVERLAY_MANIFEST:-none}\`
 - Internal presets: \`$internal_display\`
@@ -396,7 +538,7 @@ EOF
 \`\`\`bash
 bash packages/perf-tools/scripts/run-owned-stack-suite.sh \\
   --engine-ref "$resolved_ref" \\
-  --client-url "$CLIENT_URL"$(if [[ -n "$CPU_THROTTLE" ]]; then printf ' \\\n  --cpu-throttle "%s"' "$CPU_THROTTLE"; fi)$(if [[ "$internal_display" != "none" ]]; then printf ' \\\n  --internal-presets "%s"' "$internal_display"; fi)$(if [[ "$external_display" != "none" ]]; then printf ' \\\n  --external-games "%s"' "$external_display"; fi)
+  --client-url "$CLIENT_URL"$(if [[ "$REPEAT_COUNT" != "1" ]]; then printf ' \\\n  --repeat "%s"' "$REPEAT_COUNT"; fi)$(if [[ -n "$CPU_THROTTLE" ]]; then printf ' \\\n  --cpu-throttle "%s"' "$CPU_THROTTLE"; fi)$(if [[ "$internal_display" != "none" ]]; then printf ' \\\n  --internal-presets "%s"' "$internal_display"; fi)$(if [[ "$external_display" != "none" ]]; then printf ' \\\n  --external-games "%s"' "$external_display"; fi)
 \`\`\`
 EOF
 }
@@ -443,20 +585,7 @@ if [[ "$INTERNAL_PRESETS" != "none" ]]; then
         continue
       fi
 
-      cmd=(
-        npx tsx src/cli.ts run
-        --preset "$preset"
-        --server-cwd "$ACTIVE_ENGINE_REPO/server"
-        --with-client
-        --client-dev-url "$CLIENT_URL"
-        --output "$OUTPUT_DIR/${preset}.json"
-      )
-
-      if [[ -n "$CPU_THROTTLE" ]]; then
-        cmd+=(--cpu-throttle "$CPU_THROTTLE")
-      fi
-
-      if ! run_and_capture "$preset" "internal" "$OUTPUT_DIR/${preset}.json" bash -lc "cd '$TOOLS_REPO/packages/perf-tools' && ${cmd[*]@Q}"; then
+      if ! run_internal_preset "$preset"; then
         overall_status=1
       fi
     done
@@ -482,14 +611,13 @@ if [[ "$EXTERNAL_GAMES" != "none" ]]; then
           --preset "$ZOO_PRESET"
           --client-url "$CLIENT_URL"
           --port "$ZOO_PORT"
-          --output "$OUTPUT_DIR/${ZOO_PRESET}.json"
         )
 
         if [[ -n "$CPU_THROTTLE" ]]; then
           game_cmd+=(--cpu-throttle "$CPU_THROTTLE")
         fi
 
-        if ! run_and_capture "zoo:$ZOO_PRESET" "external" "$OUTPUT_DIR/${ZOO_PRESET}.json" "${game_cmd[@]}"; then
+        if ! run_external_game_preset "zoo:$ZOO_PRESET" "$ZOO_PRESET" "$ZOO_PRESET" "${game_cmd[@]}"; then
           overall_status=1
         fi
         ;;
@@ -502,14 +630,13 @@ if [[ "$EXTERNAL_GAMES" != "none" ]]; then
           --client-url "$CLIENT_URL"
           --server-cmd "$HYFIRE2_SERVER_CMD"
           --port "$HYFIRE2_PORT"
-          --output "$OUTPUT_DIR/${HYFIRE2_PRESET}.json"
         )
 
         if [[ -n "$CPU_THROTTLE" ]]; then
           game_cmd+=(--cpu-throttle "$CPU_THROTTLE")
         fi
 
-        if ! run_and_capture "hyfire2:$HYFIRE2_PRESET" "external" "$OUTPUT_DIR/${HYFIRE2_PRESET}.json" "${game_cmd[@]}"; then
+        if ! run_external_game_preset "hyfire2:$HYFIRE2_PRESET" "$HYFIRE2_PRESET" "$HYFIRE2_PRESET" "${game_cmd[@]}"; then
           overall_status=1
         fi
         ;;
