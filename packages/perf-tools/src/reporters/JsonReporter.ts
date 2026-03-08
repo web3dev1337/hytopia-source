@@ -15,6 +15,16 @@ export interface JsonReport {
     serverSnapshotCount: number;
     clientSnapshotCount: number;
   };
+  capabilities?: {
+    serverMetrics: boolean;
+    clientMetrics: boolean;
+    clientMetricSources: string[];
+  };
+  validation?: {
+    valid: boolean;
+    warnings: string[];
+    issues: string[];
+  };
 }
 
 export default class JsonReporter {
@@ -32,6 +42,12 @@ export default class JsonReporter {
         serverSnapshotCount: result.metrics.serverSnapshots.length,
         clientSnapshotCount: result.metrics.clientSnapshots.length,
       },
+      capabilities: {
+        serverMetrics: result.capabilities.serverMetrics,
+        clientMetrics: result.capabilities.clientMetrics,
+        clientMetricSources: result.capabilities.clientMetricSources,
+      },
+      validation: result.validation,
     };
   }
 

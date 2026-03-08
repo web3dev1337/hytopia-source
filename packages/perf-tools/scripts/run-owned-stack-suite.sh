@@ -3,10 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+TOOLS_REPO="$REPO_ROOT"
 
 ENGINE_REPO="$REPO_ROOT"
 ENGINE_REF=""
-CLIENT_URL="http://localhost:4173"
+CLIENT_URL=""
+CLIENT_PORT="4173"
 CPU_THROTTLE=""
 OUTPUT_ROOT="$REPO_ROOT/packages/perf-tools/perf-results/owned-stack"
 INTERNAL_PRESETS="idle,stress,stress-walkthrough"
@@ -25,6 +27,8 @@ ACTIVE_ENGINE_REPO="$ENGINE_REPO"
 RESOLVED_COMMIT=""
 RESOLVED_LABEL=""
 SUMMARY_PATH=""
+CLIENT_SERVER_PID=""
+CLIENT_SERVER_LOG=""
 
 declare -a SUMMARY_ROWS=()
 
@@ -40,6 +44,7 @@ Options:
   --engine-ref <ref>         Git ref, commit, branch, or PR number / pr:<n>
   --engine-repo <path>       Engine repo to test (default: current repo)
   --client-url <url>         Browser client URL for all client-side runs
+  --client-port <port>       Port to use when auto-launching client dev server
   --cpu-throttle <rate>      Browser CPU throttle rate for client runs
   --output-root <path>       Root directory for suite outputs
   --internal-presets <list>  Comma-separated built-in presets, or none
@@ -56,7 +61,7 @@ Options:
 Examples:
   bash packages/perf-tools/scripts/run-owned-stack-suite.sh \
     --engine-ref pr:2 \
-    --client-url http://localhost:4173
+    --client-port 4173
 
   bash packages/perf-tools/scripts/run-owned-stack-suite.sh \
     --engine-ref feature/blob-shadows \
@@ -89,6 +94,11 @@ join_by() {
 }
 
 cleanup() {
+  if [[ -n "$CLIENT_SERVER_PID" ]]; then
+    kill -TERM "-$CLIENT_SERVER_PID" >/dev/null 2>&1 || true
+    wait "$CLIENT_SERVER_PID" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "$WORKTREE_DIR" && -d "$WORKTREE_DIR" && "$KEEP_WORKTREE" != "true" ]]; then
     git -C "$ENGINE_REPO" worktree remove --force "$WORKTREE_DIR" >/dev/null 2>&1 || true
   fi
@@ -109,6 +119,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --client-url)
       CLIENT_URL="$2"
+      shift 2
+      ;;
+    --client-port)
+      CLIENT_PORT="$2"
       shift 2
       ;;
     --cpu-throttle)
@@ -173,24 +187,45 @@ if [[ ! -d "$ENGINE_REPO/.git" && ! -f "$ENGINE_REPO/.git" ]]; then
   exit 1
 fi
 
-hydrate_worktree_dependencies() {
-  if [[ -z "$WORKTREE_DIR" || ! -d "$WORKTREE_DIR" ]]; then
+prepare_engine_checkout() {
+  bash "$TOOLS_REPO/packages/perf-tools/scripts/ensure-node-modules.sh" \
+    --source-repo "$ENGINE_REPO" \
+    --target-repo "$ACTIVE_ENGINE_REPO" \
+    --packages "server,client,protocol"
+}
+
+start_client_server() {
+  if [[ -n "$CLIENT_URL" ]]; then
     return
   fi
 
-  local dep_dir=""
-
-  for dep_dir in \
-    node_modules \
-    server/node_modules \
-    client/node_modules \
-    packages/perf-tools/node_modules
-  do
-    if [[ -d "$ENGINE_REPO/$dep_dir" && ! -e "$WORKTREE_DIR/$dep_dir" ]]; then
-      mkdir -p "$(dirname "$WORKTREE_DIR/$dep_dir")"
-      ln -s "$ENGINE_REPO/$dep_dir" "$WORKTREE_DIR/$dep_dir"
-    fi
+  while lsof -iTCP:"$CLIENT_PORT" -sTCP:LISTEN -P -n >/dev/null 2>&1; do
+    CLIENT_PORT="$((CLIENT_PORT + 1))"
   done
+
+  CLIENT_URL="http://localhost:$CLIENT_PORT"
+  CLIENT_SERVER_LOG="$OUTPUT_DIR/client-dev.log"
+
+  (
+    cd "$ACTIVE_ENGINE_REPO/client"
+    exec setsid npm run dev -- --host 0.0.0.0 --port "$CLIENT_PORT" --strictPort
+  ) >"$CLIENT_SERVER_LOG" 2>&1 &
+  CLIENT_SERVER_PID=$!
+
+  for _ in $(seq 1 180); do
+    if curl -sf "$CLIENT_URL" >/dev/null 2>&1; then
+      return
+    fi
+
+    sleep 1
+  done
+
+  echo "Error: client dev server did not become healthy at $CLIENT_URL" >&2
+  exit 1
+}
+
+can_run_internal_presets() {
+  [[ -f "$ACTIVE_ENGINE_REPO/server/src/perf-harness.ts" ]]
 }
 
 resolve_engine_checkout() {
@@ -228,7 +263,6 @@ resolve_engine_checkout() {
   WORKTREE_DIR="$(mktemp -d "/tmp/hytopia-owned-stack-${RESOLVED_LABEL}-XXXXXX")"
   git -C "$ENGINE_REPO" worktree add --detach "$WORKTREE_DIR" "$RESOLVED_COMMIT" >/dev/null
   ACTIVE_ENGINE_REPO="$WORKTREE_DIR"
-  hydrate_worktree_dependencies
 }
 
 run_and_capture() {
@@ -297,10 +331,13 @@ EOF
 }
 
 resolve_engine_checkout
+prepare_engine_checkout
 
 OUTPUT_DIR="$OUTPUT_ROOT/$RESOLVED_LABEL-$(date +%Y%m%d-%H%M%S)"
 SUMMARY_PATH="$OUTPUT_DIR/README.md"
 mkdir -p "$OUTPUT_DIR"
+
+start_client_server
 
 IFS=',' read -r -a INTERNAL_PRESET_ARRAY <<< "$INTERNAL_PRESETS"
 IFS=',' read -r -a EXTERNAL_GAME_ARRAY <<< "$EXTERNAL_GAMES"
@@ -319,29 +356,39 @@ fi
 echo "Engine checkout: $ACTIVE_ENGINE_REPO"
 echo "Resolved commit: $RESOLVED_COMMIT"
 echo "Output dir: $OUTPUT_DIR"
+echo "Client URL: $CLIENT_URL"
 
 overall_status=0
 
 if [[ "$INTERNAL_PRESETS" != "none" ]]; then
-  for preset in "${INTERNAL_PRESET_ARRAY[@]}"; do
-    [[ -z "$preset" ]] && continue
+  if can_run_internal_presets; then
+    for preset in "${INTERNAL_PRESET_ARRAY[@]}"; do
+      [[ -z "$preset" ]] && continue
 
-    cmd=(
-      npx tsx src/cli.ts run
-      --preset "$preset"
-      --with-client
-      --client-dev-url "$CLIENT_URL"
-      --output "$OUTPUT_DIR/${preset}.json"
-    )
+      cmd=(
+        npx tsx src/cli.ts run
+        --preset "$preset"
+        --server-cwd "$ACTIVE_ENGINE_REPO/server"
+        --with-client
+        --client-dev-url "$CLIENT_URL"
+        --output "$OUTPUT_DIR/${preset}.json"
+      )
 
-    if [[ -n "$CPU_THROTTLE" ]]; then
-      cmd+=(--cpu-throttle "$CPU_THROTTLE")
-    fi
+      if [[ -n "$CPU_THROTTLE" ]]; then
+        cmd+=(--cpu-throttle "$CPU_THROTTLE")
+      fi
 
-    if ! run_and_capture "$preset" "internal" "$OUTPUT_DIR/${preset}.json" bash -lc "cd '$ACTIVE_ENGINE_REPO/packages/perf-tools' && ${cmd[*]@Q}"; then
-      overall_status=1
-    fi
-  done
+      if ! run_and_capture "$preset" "internal" "$OUTPUT_DIR/${preset}.json" bash -lc "cd '$TOOLS_REPO/packages/perf-tools' && ${cmd[*]@Q}"; then
+        overall_status=1
+      fi
+    done
+  else
+    echo "WARNING: skipping internal presets because $ACTIVE_ENGINE_REPO does not contain perf-harness support" >&2
+    for preset in "${INTERNAL_PRESET_ARRAY[@]}"; do
+      [[ -z "$preset" ]] && continue
+      SUMMARY_ROWS+=("| $preset | internal | skipped | perf-harness missing |")
+    done
+  fi
 fi
 
 if [[ "$EXTERNAL_GAMES" != "none" ]]; then
@@ -351,7 +398,8 @@ if [[ "$EXTERNAL_GAMES" != "none" ]]; then
     case "$game" in
       zoo)
         game_cmd=(
-          bash "$ACTIVE_ENGINE_REPO/packages/perf-tools/scripts/run-external-game-benchmark.sh"
+          bash "$TOOLS_REPO/packages/perf-tools/scripts/run-external-game-benchmark.sh"
+          --engine-repo "$ACTIVE_ENGINE_REPO"
           --game-dir "$ZOO_DIR"
           --preset "$ZOO_PRESET"
           --client-url "$CLIENT_URL"
@@ -369,7 +417,8 @@ if [[ "$EXTERNAL_GAMES" != "none" ]]; then
         ;;
       hyfire2)
         game_cmd=(
-          bash "$ACTIVE_ENGINE_REPO/packages/perf-tools/scripts/run-external-game-benchmark.sh"
+          bash "$TOOLS_REPO/packages/perf-tools/scripts/run-external-game-benchmark.sh"
+          --engine-repo "$ACTIVE_ENGINE_REPO"
           --game-dir "$HYFIRE2_DIR"
           --preset "$HYFIRE2_PRESET"
           --client-url "$CLIENT_URL"

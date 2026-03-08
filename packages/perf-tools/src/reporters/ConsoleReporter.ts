@@ -83,6 +83,21 @@ export default class ConsoleReporter {
     }
 
     console.log('');
+
+    if (result.validation.warnings.length > 0 || result.validation.issues.length > 0) {
+      console.log('Validation:');
+
+      for (const warning of result.validation.warnings) {
+        console.log(`  WARN ${warning}`);
+      }
+
+      for (const issue of result.validation.issues) {
+        console.log(`  FAIL ${issue}`);
+      }
+
+      console.log(`  Overall: ${result.validation.valid ? 'VALID' : 'INVALID'}`);
+      console.log('');
+    }
   }
 
   public reportComparison(comparison: ComparisonResult): void {

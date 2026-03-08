@@ -34,7 +34,7 @@ program
   .option('--no-perf-api', 'Skip PerfHarness API, use only OS-level monitoring')
   .option('--log-file <path>', 'Capture server stdout/stderr to file')
   .option('--with-client', 'Launch headless browser client and collect client-side metrics')
-  .option('--client-dev-url <url>', 'URL for the Vite client dev server', 'http://localhost:5173')
+  .option('--client-dev-url <url>', 'URL for the Vite client dev server', 'http://localhost:4173')
   .option('--cpu-throttle <rate>', 'Apply browser CPU throttle rate (1=no throttle, 4=mid mobile, 16=low-end)', parseFloat)
   .option('--external-server <url>', 'Use an already-running external server (skip server startup)')
   .option('--verbose', 'Enable verbose logging')
@@ -79,7 +79,11 @@ program
 
     consoleReporter.reportBenchmark(result);
 
-    if (options.baseline) {
+    if (!result.validation.valid) {
+      process.exitCode = 1;
+    }
+
+    if (options.baseline && result.validation.valid) {
       const baseline = BaselineComparer.loadBaseline(options.baseline);
       const comparer = new BaselineComparer();
       const comparison = comparer.compare(baseline, result.baseline, scenario.name);
@@ -89,6 +93,8 @@ program
       if (comparison.overallStatus === 'fail') {
         process.exitCode = 1;
       }
+    } else if (options.baseline && !result.validation.valid) {
+      console.error('Skipping baseline comparison because the new run is invalid.');
     }
 
     if (options.output) {
@@ -115,15 +121,65 @@ program
   .option('--fail <pct>', 'Failure threshold percentage', '15')
   .option('--fail-on-regression', 'Exit with code 1 if any metric regresses beyond fail threshold')
   .action((beforePath, afterPath, options) => {
-    const before = BaselineComparer.loadBaseline(beforePath);
-    const after = BaselineComparer.loadBaseline(afterPath);
+    const beforeInput = BaselineComparer.loadInput(beforePath);
+    const afterInput = BaselineComparer.loadInput(afterPath);
+    const before = beforeInput.baseline;
+    const after = afterInput.baseline;
 
     const comparer = new BaselineComparer({
       warningThresholdPct: parseFloat(options.warn),
       failThresholdPct: parseFloat(options.fail),
     });
 
-    const comparison = comparer.compare(before, after, `${path.basename(beforePath)} vs ${path.basename(afterPath)}`);
+    if (beforeInput.validation?.valid === false || afterInput.validation?.valid === false) {
+      console.error('Cannot compare invalid benchmark reports.');
+
+      if (beforeInput.validation?.valid === false) {
+        console.error(`  ${beforePath}`);
+        for (const issue of beforeInput.validation.issues ?? []) {
+          console.error(`    - ${issue}`);
+        }
+      }
+
+      if (afterInput.validation?.valid === false) {
+        console.error(`  ${afterPath}`);
+        for (const issue of afterInput.validation.issues ?? []) {
+          console.error(`    - ${issue}`);
+        }
+      }
+
+      process.exit(1);
+    }
+
+    const includeServerMetrics = hasServerMetrics(beforeInput) && hasServerMetrics(afterInput);
+    const includeClientMetrics = hasClientMetrics(beforeInput) && hasClientMetrics(afterInput);
+    const includeClientRenderMetrics = includeClientMetrics && hasClientRenderMetrics(beforeInput) && hasClientRenderMetrics(afterInput);
+
+    if (!includeServerMetrics && !includeClientMetrics) {
+      console.error('Cannot compare these reports because they do not share any comparable metric categories.');
+      process.exit(1);
+    }
+
+    if (!includeServerMetrics) {
+      console.log('Skipping server metrics: one or both reports lack server snapshots.');
+    }
+
+    if (!includeClientMetrics) {
+      console.log('Skipping client metrics: one or both reports lack client snapshots.');
+    } else if (!includeClientRenderMetrics) {
+      console.log('Skipping client draw-call and triangle metrics: one or both reports lack usable render counters.');
+    }
+
+    const comparison = comparer.compare(
+      before,
+      after,
+      `${path.basename(beforePath)} vs ${path.basename(afterPath)}`,
+      {
+        includeServerMetrics,
+        includeClientMetrics,
+        includeClientRenderMetrics,
+      },
+    );
 
     const reporter = new ConsoleReporter();
 
@@ -157,3 +213,29 @@ program
   });
 
 program.parse();
+
+function hasServerMetrics(input: ReturnType<typeof BaselineComparer.loadInput>): boolean {
+  if ((input.metrics?.serverSnapshotCount ?? 0) > 0) {
+    return true;
+  }
+
+  return input.baseline.avgTickMs > 0 || Object.keys(input.baseline.operations ?? {}).length > 0 || input.baseline.network !== undefined;
+}
+
+function hasClientMetrics(input: ReturnType<typeof BaselineComparer.loadInput>): boolean {
+  if ((input.metrics?.clientSnapshotCount ?? 0) > 0) {
+    return true;
+  }
+
+  return input.baseline.client !== undefined || input.baseline.avgFps !== undefined;
+}
+
+function hasClientRenderMetrics(input: ReturnType<typeof BaselineComparer.loadInput>): boolean {
+  const client = input.baseline.client;
+
+  if (!client) {
+    return false;
+  }
+
+  return client.avgDrawCalls > 0 || client.maxDrawCalls > 0 || client.avgTriangles > 0 || client.maxTriangles > 0;
+}

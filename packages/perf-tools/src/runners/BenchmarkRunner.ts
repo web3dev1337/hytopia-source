@@ -32,12 +32,26 @@ export interface BenchmarkResult {
   processMetrics?: ProcessMetrics;
   durationMs: number;
   phaseResults: PhaseResult[];
+  capabilities: BenchmarkCapabilities;
+  validation: BenchmarkValidation;
 }
 
 export interface PhaseResult {
   name: string;
   durationMs: number;
   collected: boolean;
+}
+
+export interface BenchmarkCapabilities {
+  serverMetrics: boolean;
+  clientMetrics: boolean;
+  clientMetricSources: Array<'perf_bridge' | 'webgl_fallback'>;
+}
+
+export interface BenchmarkValidation {
+  valid: boolean;
+  warnings: string[];
+  issues: string[];
 }
 
 export default class BenchmarkRunner {
@@ -173,6 +187,8 @@ export default class BenchmarkRunner {
 
     const metrics = this._collector.stopCollecting();
     const baseline = this._buildBaseline(metrics);
+    const capabilities = this._buildCapabilities(metrics);
+    const validation = this._buildValidation(metrics, capabilities, scenario);
 
     return {
       scenario,
@@ -181,6 +197,8 @@ export default class BenchmarkRunner {
       processMetrics,
       durationMs: Date.now() - startTime,
       phaseResults,
+      capabilities,
+      validation,
     };
   }
 
@@ -623,6 +641,52 @@ export default class BenchmarkRunner {
       this._logStream.end();
       this._logStream = null;
     }
+  }
+
+  private _buildCapabilities(metrics: CollectedMetrics): BenchmarkCapabilities {
+    const clientMetricSources = Array.from(new Set(
+      metrics.clientSnapshots
+        .map(snapshot => snapshot.source)
+        .filter((source): source is 'perf_bridge' | 'webgl_fallback' => source === 'perf_bridge' || source === 'webgl_fallback'),
+    ));
+
+    return {
+      serverMetrics: metrics.serverSnapshots.length > 0,
+      clientMetrics: metrics.clientSnapshots.length > 0,
+      clientMetricSources,
+    };
+  }
+
+  private _buildValidation(
+    metrics: CollectedMetrics,
+    capabilities: BenchmarkCapabilities,
+    scenario: Scenario,
+  ): BenchmarkValidation {
+    const warnings: string[] = [];
+    const issues: string[] = [];
+    const collectedPhaseCount = scenario.phases.filter(phase => phase.collect).length;
+
+    if (collectedPhaseCount > 0 && !capabilities.serverMetrics && !capabilities.clientMetrics) {
+      issues.push('No benchmark snapshots were collected. The target client/server likely failed to expose metrics or failed to load.');
+    }
+
+    if (this._options.withClient && collectedPhaseCount > 0 && !capabilities.clientMetrics) {
+      issues.push('Client metrics were requested but no client snapshots were collected.');
+    }
+
+    if (!this._options.noPerfApi && collectedPhaseCount > 0 && !capabilities.serverMetrics) {
+      warnings.push('No server snapshots were collected. This run only supports client-side comparison.');
+    }
+
+    if (capabilities.clientMetricSources.includes('webgl_fallback') && !capabilities.clientMetricSources.includes('perf_bridge')) {
+      warnings.push('Client metrics were collected via WebGL fallback instrumentation because PerfBridge was unavailable.');
+    }
+
+    return {
+      valid: issues.length === 0,
+      warnings,
+      issues,
+    };
   }
 
   private _buildBaseline(metrics: CollectedMetrics): BaselineResult {

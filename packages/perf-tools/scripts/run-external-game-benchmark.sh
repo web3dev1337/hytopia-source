@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 GAME_DIR=""
 PRESET=""
 CLIENT_URL=""
+ENGINE_REPO="$REPO_ROOT"
 SERVER_CMD="npm start"
 PORT="9091"
 CPU_THROTTLE=""
@@ -24,6 +25,7 @@ Required:
   --client-url <url>     Client dev/prod URL used by the benchmark browser
 
 Options:
+  --engine-repo <path>   Engine repo/worktree whose SDK/client is under test
   --server-cmd <cmd>     Command used to start the external game server (default: npm start)
   --port <port>          HTTPS port for the external game server (default: 9091)
   --cpu-throttle <rate>  Browser CPU throttle rate (example: 4, 16)
@@ -32,6 +34,7 @@ Options:
 
 Examples:
   bash packages/perf-tools/scripts/run-external-game-benchmark.sh \
+    --engine-repo /home/ab/GitHub/hytopia/work1 \
     --game-dir /home/ab/GitHub/games/hyfire2-sdk-compat \
     --preset hyfire2-bots \
     --client-url http://localhost:4173 \
@@ -40,12 +43,14 @@ Examples:
     --output perf-results/hyfire2-under-test.json
 
   bash packages/perf-tools/scripts/run-external-game-benchmark.sh \
+    --engine-repo /home/ab/GitHub/hytopia/work1 \
     --game-dir /home/ab/GitHub/games/hytopia/zoo-game/work1 \
     --preset zoo-game-full \
     --client-url http://localhost:4173 \
     --output perf-results/zoo-pr2.json
 
   bash packages/perf-tools/scripts/run-external-game-benchmark.sh \
+    --engine-repo /home/ab/GitHub/hytopia/work1 \
     --game-dir /home/ab/GitHub/games/hytopia/zoo-game/work1 \
     --preset zoo-game-observe \
     --client-url http://localhost:4173 \
@@ -70,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --client-url)
       CLIENT_URL="$2"
+      shift 2
+      ;;
+    --engine-repo)
+      ENGINE_REPO="$(cd "$2" && pwd)"
       shift 2
       ;;
     --server-cmd)
@@ -126,9 +135,10 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-echo "==> Linking current SDK checkout into external game"
-bash "$SCRIPT_DIR/link-sdk.sh"
-bash "$SCRIPT_DIR/setup-game.sh" "$GAME_DIR"
+echo "==> Linking SDK checkout into external game"
+echo "Engine repo: $ENGINE_REPO"
+bash "$SCRIPT_DIR/link-sdk.sh" --engine-repo "$ENGINE_REPO"
+bash "$SCRIPT_DIR/setup-game.sh" "$GAME_DIR" --engine-repo "$ENGINE_REPO"
 
 echo ""
 echo "==> Starting external game server"

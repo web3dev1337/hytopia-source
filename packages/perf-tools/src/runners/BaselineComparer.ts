@@ -60,6 +60,25 @@ export interface BaselineComparerOptions {
   failThresholdPct?: number;
 }
 
+export interface ComparisonScope {
+  includeServerMetrics?: boolean;
+  includeClientMetrics?: boolean;
+  includeClientRenderMetrics?: boolean;
+}
+
+export interface LoadedBenchmarkInput {
+  baseline: BaselineResult;
+  metrics?: {
+    serverSnapshotCount?: number;
+    clientSnapshotCount?: number;
+  };
+  validation?: {
+    valid?: boolean;
+    warnings?: string[];
+    issues?: string[];
+  };
+}
+
 export default class BaselineComparer {
   private _warningPct: number;
   private _failPct: number;
@@ -69,35 +88,50 @@ export default class BaselineComparer {
     this._failPct = options?.failThresholdPct ?? 15;
   }
 
-  public compare(baseline: BaselineResult, current: BaselineResult, scenarioName: string = 'benchmark'): ComparisonResult {
+  public compare(
+    baseline: BaselineResult,
+    current: BaselineResult,
+    scenarioName: string = 'benchmark',
+    scope?: ComparisonScope,
+  ): ComparisonResult {
     const entries: ComparisonEntry[] = [];
+    const includeServerMetrics = scope?.includeServerMetrics ?? true;
+    const includeClientMetrics = scope?.includeClientMetrics ?? true;
+    const includeClientRenderMetrics = scope?.includeClientRenderMetrics ?? includeClientMetrics;
 
-    entries.push(this._compareMetric('avgTickMs', baseline.avgTickMs, current.avgTickMs));
-    entries.push(this._compareMetric('maxTickMs', baseline.maxTickMs, current.maxTickMs));
-    entries.push(this._compareMetric('p95TickMs', baseline.p95TickMs, current.p95TickMs));
-    entries.push(this._compareMetric('p99TickMs', baseline.p99TickMs, current.p99TickMs));
-    entries.push(this._compareMetric('ticksOverBudgetPct', baseline.ticksOverBudgetPct, current.ticksOverBudgetPct));
-    entries.push(this._compareMetric('avgMemoryMb', baseline.avgMemoryMb, current.avgMemoryMb));
+    if (includeServerMetrics) {
+      entries.push(this._compareMetric('avgTickMs', baseline.avgTickMs, current.avgTickMs));
+      entries.push(this._compareMetric('maxTickMs', baseline.maxTickMs, current.maxTickMs));
+      entries.push(this._compareMetric('p95TickMs', baseline.p95TickMs, current.p95TickMs));
+      entries.push(this._compareMetric('p99TickMs', baseline.p99TickMs, current.p99TickMs));
+      entries.push(this._compareMetric('ticksOverBudgetPct', baseline.ticksOverBudgetPct, current.ticksOverBudgetPct));
+      entries.push(this._compareMetric('avgMemoryMb', baseline.avgMemoryMb, current.avgMemoryMb));
+    }
 
-    if (baseline.avgFps !== undefined && current.avgFps !== undefined) {
+    if (includeClientMetrics && baseline.avgFps !== undefined && current.avgFps !== undefined) {
       entries.push(this._compareMetric('avgFps', baseline.avgFps, current.avgFps, true));
     }
 
-    if (baseline.client && current.client) {
+    if (includeClientMetrics && baseline.client && current.client) {
       entries.push(this._compareMetric('client.avgFps', baseline.client.avgFps, current.client.avgFps, true));
       entries.push(this._compareMetric('client.minFps', baseline.client.minFps, current.client.minFps, true));
-      entries.push(this._compareMetric('client.avgDrawCalls', baseline.client.avgDrawCalls, current.client.avgDrawCalls));
-      entries.push(this._compareMetric('client.avgTriangles', baseline.client.avgTriangles, current.client.avgTriangles));
       entries.push(this._compareMetric('client.avgFrameTimeMs', baseline.client.avgFrameTimeMs, current.client.avgFrameTimeMs));
+
+      if (includeClientRenderMetrics) {
+        entries.push(this._compareMetric('client.avgDrawCalls', baseline.client.avgDrawCalls, current.client.avgDrawCalls));
+        entries.push(this._compareMetric('client.avgTriangles', baseline.client.avgTriangles, current.client.avgTriangles));
+      }
     }
 
-    if (baseline.network && current.network) {
+    if (includeServerMetrics && baseline.network && current.network) {
       entries.push(this._compareMetric('net.maxBytesSentPerSecond', baseline.network.maxBytesSentPerSecond, current.network.maxBytesSentPerSecond));
       entries.push(this._compareMetric('net.avgBytesSentPerSecond', baseline.network.avgBytesSentPerSecond, current.network.avgBytesSentPerSecond));
       entries.push(this._compareMetric('net.avgSerializationMs', baseline.network.avgSerializationMs, current.network.avgSerializationMs));
     }
 
-    const allBaselineOps = new Set([...Object.keys(baseline.operations ?? {}), ...Object.keys(current.operations ?? {})]);
+    const allBaselineOps = includeServerMetrics
+      ? new Set([...Object.keys(baseline.operations ?? {}), ...Object.keys(current.operations ?? {})])
+      : new Set<string>();
 
     for (const op of allBaselineOps) {
       if (baseline.operations?.[op] && current.operations?.[op]) {
@@ -121,16 +155,25 @@ export default class BaselineComparer {
     };
   }
 
-  public static loadBaseline(filePath: string): BaselineResult {
+  public static loadInput(filePath: string): LoadedBenchmarkInput {
     const content = fs.readFileSync(filePath, 'utf-8');
     const data = JSON.parse(content);
 
-    // Support both raw baseline files and full report files (which have a .baseline field)
     if (data.baseline && typeof data.baseline === 'object' && 'avgTickMs' in data.baseline) {
-      return data.baseline as BaselineResult;
+      return {
+        baseline: data.baseline as BaselineResult,
+        metrics: data.metrics,
+        validation: data.validation,
+      };
     }
 
-    return data as BaselineResult;
+    return {
+      baseline: data as BaselineResult,
+    };
+  }
+
+  public static loadBaseline(filePath: string): BaselineResult {
+    return BaselineComparer.loadInput(filePath).baseline;
   }
 
   public static saveBaseline(filePath: string, baseline: BaselineResult): void {

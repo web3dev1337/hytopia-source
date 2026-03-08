@@ -141,6 +141,7 @@ Representative presets:
 
 Core files:
 
+- [ensure-node-modules.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/ensure-node-modules.sh)
 - [link-sdk.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/link-sdk.sh)
 - [setup-game.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/setup-game.sh)
 - [run-external-game-benchmark.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/run-external-game-benchmark.sh)
@@ -153,6 +154,15 @@ What these do:
 - run a real-game preset end-to-end against an external game using the current source checkout under test
 - run the core synthetic presets plus owned-game presets from one wrapper command against a chosen engine branch, commit, or PR number
 - let HyFire2 or Zoo Game run against local engine changes
+
+Cross-ref hardening added after testing `RZDESIGN/hytopia-source@merged-all-prs-into-one`:
+
+- target engine worktrees no longer borrow current-branch `client/node_modules` or `server/node_modules` blindly
+- dependency reuse only happens when the target package lockfile or manifest matches; otherwise the target ref gets its own install
+- SDK linking for external-game runs now does a runtime `build:server` build instead of the full declaration/docs pipeline, so older engine refs do not fail just because their type/doc build is stale
+- the suite auto-picks the actual free client port starting from `4173` and launches Vite with `--strictPort`, preventing silent `4173` -> `4174` drift
+- benchmark JSON now records validation/capability state so missing snapshots are surfaced as warnings/issues instead of silently becoming zero baselines
+- `compare` now skips non-shared metric families such as server snapshots or render counters when one side lacks them, instead of treating missing data as an improvement
 
 The simplest “test this engine PR across our stack” entrypoint is now:
 
@@ -168,6 +178,11 @@ That wrapper can:
 - run internal synthetic presets with client metrics enabled
 - run Zoo Game and HyFire2 through the external-game wrapper with the owned local paths baked in
 - write all JSON outputs plus a per-run markdown summary into `packages/perf-tools/perf-results/owned-stack/`
+
+Important limitation:
+
+- very old engine refs can still produce client-only real-game reports if they predate PerfHarness server snapshots
+- those runs are still valid for FPS/frame-time comparison when the client loads, but the framework now labels them that way explicitly instead of pretending they are full-stack apples-to-apples
 
 Important clarification:
 

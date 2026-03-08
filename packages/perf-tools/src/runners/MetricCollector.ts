@@ -50,6 +50,7 @@ export interface OperationSnapshot {
 
 export interface ClientSnapshot {
   timestamp: number;
+  source?: 'perf_bridge' | 'webgl_fallback';
   fps: number;
   frameTimeMs: number;
   drawCalls: number;

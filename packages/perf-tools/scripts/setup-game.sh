@@ -1,20 +1,47 @@
 #!/bin/bash
 # Usage: ./setup-game.sh <game-dir>
 # Links our modified SDK into a game directory
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+DEFAULT_REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$DEFAULT_REPO_ROOT"
+GAME_DIR=""
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <game-dir>"
+usage() {
+  echo "Usage: $0 <game-dir> [--engine-repo <path>]"
   echo "Examples:"
   echo "  $0 /home/ab/GitHub/games/hyfire2-sdk-compat"
   echo "  $0 /home/ab/GitHub/games/hytopia/zoo-game/work1"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --engine-repo)
+      REPO_ROOT="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [[ -z "$GAME_DIR" ]]; then
+        GAME_DIR="$(cd "$1" && pwd)"
+        shift
+      else
+        echo "Unknown argument: $1" >&2
+        usage >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+if [[ -z "$GAME_DIR" ]]; then
+  usage
   exit 1
 fi
-
-GAME_DIR="$(cd "$1" && pwd)"
 
 if [ ! -f "$GAME_DIR/package.json" ]; then
   echo "Error: No package.json found in $GAME_DIR"

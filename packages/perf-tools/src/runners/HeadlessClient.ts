@@ -1,5 +1,15 @@
 import type { ClientSnapshot } from './MetricCollector.js';
 
+declare global {
+  interface Performance {
+    memory?: {
+      jsHeapSizeLimit: number;
+      totalJSHeapSize: number;
+      usedJSHeapSize: number;
+    };
+  }
+}
+
 export interface HeadlessClientOptions {
   url: string;
   headless?: boolean;
@@ -108,6 +118,124 @@ export default class HeadlessClient {
       };
 
     });
+
+    await page.evaluateOnNewDocument(() => {
+      if ((window as any).__HYTOPIA_FALLBACK_PERF__) {
+        return;
+      }
+
+      const state = {
+        fps: 0,
+        frameTimeMs: 0,
+        lastFrameTimestamp: 0,
+        fpsWindowStart: 0,
+        fpsWindowFrames: 0,
+        drawCallsThisFrame: 0,
+        trianglesThisFrame: 0,
+        drawCallsLastFrame: 0,
+        trianglesLastFrame: 0,
+        usedMemoryMb: 0,
+        totalMemoryMb: 0,
+        hasSeenDrawCall: false,
+      };
+
+      const getTrianglesPerCall = (mode: number, count: number): number => {
+        switch (mode) {
+          case WebGLRenderingContext.TRIANGLES:
+            return Math.floor(count / 3);
+          case WebGLRenderingContext.TRIANGLE_STRIP:
+          case WebGLRenderingContext.TRIANGLE_FAN:
+            return Math.max(0, count - 2);
+          default:
+            return 0;
+        }
+      };
+
+      const wrapDraw = (proto: any, methodName: string, getCount: (...args: any[]) => number, getInstances?: (...args: any[]) => number) => {
+        if (!proto?.[methodName] || proto[methodName].__hytopiaPerfWrapped) {
+          return;
+        }
+
+        const original = proto[methodName];
+
+        const wrapped = function(this: unknown, ...args: any[]) {
+          const count = getCount(...args);
+          const instances = getInstances ? Math.max(1, getInstances(...args)) : 1;
+
+          state.drawCallsThisFrame += 1;
+          state.trianglesThisFrame += getTrianglesPerCall(args[0], count) * instances;
+          state.hasSeenDrawCall = true;
+
+          return original.apply(this, args);
+        };
+
+        wrapped.__hytopiaPerfWrapped = true;
+        proto[methodName] = wrapped;
+      };
+
+      const webgl1Prototype = typeof WebGLRenderingContext !== 'undefined' ? WebGLRenderingContext.prototype : undefined;
+      const webgl2Prototype = typeof WebGL2RenderingContext !== 'undefined' ? WebGL2RenderingContext.prototype : undefined;
+
+      wrapDraw(webgl1Prototype, 'drawArrays', (_mode: number, _first: number, count: number) => count);
+      wrapDraw(webgl1Prototype, 'drawElements', (_mode: number, count: number) => count);
+      wrapDraw(webgl2Prototype, 'drawArrays', (_mode: number, _first: number, count: number) => count);
+      wrapDraw(webgl2Prototype, 'drawElements', (_mode: number, count: number) => count);
+      wrapDraw(webgl2Prototype, 'drawArraysInstanced', (_mode: number, _first: number, count: number) => count, (_mode: number, _first: number, _count: number, instanceCount: number) => instanceCount);
+      wrapDraw(webgl2Prototype, 'drawElementsInstanced', (_mode: number, count: number) => count, (_mode: number, _count: number, _type: number, _offset: number, instanceCount: number) => instanceCount);
+
+      const tick = (timestamp: number) => {
+        if (state.lastFrameTimestamp > 0) {
+          state.frameTimeMs = timestamp - state.lastFrameTimestamp;
+        }
+
+        if (state.fpsWindowStart === 0) {
+          state.fpsWindowStart = timestamp;
+        }
+
+        state.fpsWindowFrames += 1;
+
+        if (timestamp - state.fpsWindowStart >= 1000) {
+          state.fps = (state.fpsWindowFrames * 1000) / (timestamp - state.fpsWindowStart);
+          state.fpsWindowFrames = 0;
+          state.fpsWindowStart = timestamp;
+        }
+
+        state.lastFrameTimestamp = timestamp;
+        state.drawCallsLastFrame = state.drawCallsThisFrame;
+        state.trianglesLastFrame = state.trianglesThisFrame;
+        state.drawCallsThisFrame = 0;
+        state.trianglesThisFrame = 0;
+
+        const memory = performance.memory;
+
+        if (memory) {
+          state.usedMemoryMb = memory.usedJSHeapSize / (1024 * 1024);
+          state.totalMemoryMb = memory.totalJSHeapSize / (1024 * 1024);
+        }
+
+        requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+
+      (window as any).__HYTOPIA_FALLBACK_PERF__ = {
+        isReady() {
+          return state.hasSeenDrawCall;
+        },
+        snapshot() {
+          return {
+            source: 'webgl_fallback',
+            fps: state.fps,
+            frameTimeMs: state.frameTimeMs,
+            drawCalls: state.drawCallsLastFrame,
+            triangles: state.trianglesLastFrame,
+            textureMemoryMb: 0,
+            usedMemoryMb: state.usedMemoryMb,
+            totalMemoryMb: state.totalMemoryMb,
+          };
+        },
+      };
+    });
   }
 
   /**
@@ -150,8 +278,17 @@ export default class HeadlessClient {
       try {
         const ready = await page.evaluate(() => {
           const perf = (window as any).__HYTOPIA_PERF__;
+          const fallbackPerf = (window as any).__HYTOPIA_FALLBACK_PERF__;
 
-          return perf && typeof perf.snapshot === 'function';
+          if (perf && typeof perf.snapshot === 'function') {
+            return true;
+          }
+
+          if (fallbackPerf && typeof fallbackPerf.isReady === 'function') {
+            return fallbackPerf.isReady();
+          }
+
+          return false;
         });
 
         if (ready) return true;
@@ -192,28 +329,23 @@ export default class HeadlessClient {
 
       const metrics = await page.evaluate(() => {
         const perf = (window as any).__HYTOPIA_PERF__;
-
-        if (!perf) return null;
-
-        // Prefer snapshot() method (rich data), fall back to flat properties
-        if (typeof perf.snapshot === 'function') {
-          return perf.snapshot();
-        }
+        const fallbackPerf = (window as any).__HYTOPIA_FALLBACK_PERF__;
 
         return {
-          fps: perf.fps ?? 0,
-          frameTimeMs: perf.frameTimeMs ?? 0,
-          drawCalls: perf.drawCalls ?? 0,
-          triangles: perf.triangles ?? 0,
-          textureMemoryMb: perf.textureMemoryMb ?? 0,
+          perfSnapshot: perf && typeof perf.snapshot === 'function' ? perf.snapshot() : null,
+          fallbackSnapshot: fallbackPerf && typeof fallbackPerf.snapshot === 'function' && fallbackPerf.isReady()
+            ? fallbackPerf.snapshot()
+            : null,
         };
       });
 
-      if (!metrics) return null;
+      const normalized = normalizeClientMetrics(metrics?.perfSnapshot, metrics?.fallbackSnapshot);
+
+      if (!normalized) return null;
 
       const snapshot: ClientSnapshot = {
         timestamp: Date.now(),
-        ...metrics,
+        ...normalized,
       };
 
       this._performanceEntries.push(snapshot);
@@ -436,4 +568,116 @@ export default class HeadlessClient {
   public get isConnected(): boolean {
     return this._connected;
   }
+}
+
+type RawPerfSnapshot = Record<string, unknown> | null | undefined;
+
+function normalizeClientMetrics(perfSnapshot: RawPerfSnapshot, fallbackSnapshot: RawPerfSnapshot): Omit<ClientSnapshot, 'timestamp'> | null {
+  if (!perfSnapshot && !fallbackSnapshot) {
+    return null;
+  }
+
+  const perf = asObject(perfSnapshot);
+  const fallback = asObject(fallbackSnapshot);
+  const perfFrame = asObject(perf?.frame);
+  const perfMemory = asObject(perf?.memory);
+  const perfEntities = asObject(perf?.entities);
+  const perfWorld = asObject(perf?.world);
+  const perfChunks = asObject(perf?.chunks);
+  const perfGltf = asObject(perf?.gltf);
+
+  const entityCount = asNumber(perfEntities?.count) ?? asNumber(perfWorld?.entityCount);
+  const chunkCount = asNumber(perfChunks?.count) ?? asNumber(perfWorld?.chunkCount);
+  const visibleChunkCount = asNumber(perfChunks?.visible);
+
+  return {
+    source: perf ? 'perf_bridge' : 'webgl_fallback',
+    fps: coalesceNumber(
+      asNumber(perf?.fps),
+      asNumber(perfFrame?.currentFps),
+      asNumber(fallback?.fps),
+      0,
+    ),
+    frameTimeMs: coalesceNumber(
+      asNumber(perf?.frameTimeMs),
+      asNumber(perfFrame?.currentFrameMs),
+      asNumber(fallback?.frameTimeMs),
+      0,
+    ),
+    drawCalls: coalesceNumber(
+      asNumber(perf?.drawCalls),
+      asNumber(fallback?.drawCalls),
+      0,
+    ),
+    triangles: coalesceNumber(
+      asNumber(perf?.triangles),
+      asNumber(fallback?.triangles),
+      0,
+    ),
+    textureMemoryMb: coalesceNumber(asNumber(perf?.textureMemoryMb), 0),
+    geometries: asNumber(perf?.geometries) ?? undefined,
+    textures: asNumber(perf?.textures) ?? undefined,
+    programs: asNumber(perf?.programs) ?? undefined,
+    usedMemoryMb: coalesceNumber(
+      asNumber(perf?.usedMemoryMb),
+      asNumber(perfMemory?.usedHeapMb),
+      asNumber(fallback?.usedMemoryMb),
+      0,
+    ),
+    totalMemoryMb: coalesceNumber(
+      asNumber(perf?.totalMemoryMb),
+      asNumber(perfMemory?.totalHeapMb),
+      asNumber(fallback?.totalMemoryMb),
+      0,
+    ),
+    entities: entityCount === undefined
+      ? undefined
+      : {
+          count: entityCount,
+          inViewDistance: coalesceNumber(asNumber(perfEntities?.inViewDistance), entityCount),
+          frustumCulled: coalesceNumber(asNumber(perfEntities?.frustumCulled), 0),
+          staticEnvironment: coalesceNumber(asNumber(perfEntities?.staticEnvironment), 0),
+        },
+    chunks: chunkCount === undefined && visibleChunkCount === undefined
+      ? undefined
+      : {
+          count: coalesceNumber(chunkCount, visibleChunkCount, 0),
+          visible: coalesceNumber(visibleChunkCount, chunkCount, 0),
+          blocks: coalesceNumber(asNumber(perfChunks?.blocks), 0),
+          opaqueFaces: coalesceNumber(asNumber(perfChunks?.opaqueFaces), 0),
+          transparentFaces: coalesceNumber(asNumber(perfChunks?.transparentFaces), 0),
+          liquidFaces: coalesceNumber(asNumber(perfChunks?.liquidFaces), 0),
+        },
+    gltf: perfGltf
+      ? {
+          files: coalesceNumber(asNumber(perfGltf?.files), 0),
+          sourceMeshes: coalesceNumber(asNumber(perfGltf?.sourceMeshes), 0),
+          clonedMeshes: coalesceNumber(asNumber(perfGltf?.clonedMeshes), asNumber(perfGltf?.clonedMeshCount), 0),
+          instancedMeshes: coalesceNumber(asNumber(perfGltf?.instancedMeshes), asNumber(perfGltf?.instancedMeshCount), 0),
+          drawCallsSaved: coalesceNumber(asNumber(perfGltf?.drawCallsSaved), 0),
+        }
+      : undefined,
+  };
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function coalesceNumber(...values: Array<number | undefined>): number {
+  for (const value of values) {
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return 0;
 }
