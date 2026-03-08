@@ -20,6 +20,7 @@ These are non-negotiable. Any PR violating these should be rejected.
 | 8 | No inline value equality checks | Create and use utility functions |
 | 9 | Use `async/await` over `.then()` chains | Clearer error handling, better stack traces |
 | 10 | Configuration arrays must be `readonly` | Prevents external mutation of internal state |
+| 11 | 3+ identical patterns → mapping table or helper | Prevents boilerplate sprawl |
 
 ---
 
@@ -706,7 +707,7 @@ this._game.settingsManager.qualityPerfTradeoff.viewDistance.enabled;
 - 70+ identical setter+emit patterns across Entity, PlayerCamera, ParticleEmitter
 - Inline RGB color equality checks duplicated
 
-**For new code**: If you see 5+ methods following the same pattern, use a mapping table or generic helper.
+**For new code**: If you see 3+ methods following the same pattern, use a mapping table or generic helper.
 
 ---
 
@@ -776,7 +777,7 @@ Use this checklist when reviewing AI-generated pull requests.
 - [ ] Configuration arrays are `readonly`
 - [ ] External input validated before merging into internal state
 - [ ] `async/await` used instead of `.then()` chains
-- [ ] No data-driven boilerplate (5+ identical patterns → use mapping table)
+- [ ] No data-driven boilerplate (3+ identical patterns → use mapping table)
 - [ ] Doesn't add responsibilities to known God Classes
 
 ---
