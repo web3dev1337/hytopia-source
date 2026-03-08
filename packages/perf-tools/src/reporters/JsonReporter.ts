@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { BenchmarkResult } from '../runners/BenchmarkRunner.js';
 import type { ComparisonResult } from '../runners/BaselineComparer.js';
 
@@ -54,6 +55,7 @@ export default class JsonReporter {
   }
 
   public writeReport(report: JsonReport, outputPath: string): void {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, JSON.stringify(report, null, 2), 'utf-8');
   }
 
@@ -68,6 +70,7 @@ export default class JsonReporter {
       },
     };
 
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, JSON.stringify(data, null, 2), 'utf-8');
   }
 }

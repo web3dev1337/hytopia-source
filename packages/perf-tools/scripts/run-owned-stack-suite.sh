@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 TOOLS_REPO="$REPO_ROOT"
+INVOCATION_CWD="$(pwd)"
 
 ENGINE_REPO="$REPO_ROOT"
 ENGINE_REF=""
@@ -193,6 +194,10 @@ done
 if [[ ! -d "$ENGINE_REPO/.git" && ! -f "$ENGINE_REPO/.git" ]]; then
   echo "Error: $ENGINE_REPO is not a git repo" >&2
   exit 1
+fi
+
+if [[ "$OUTPUT_ROOT" != /* ]]; then
+  OUTPUT_ROOT="$INVOCATION_CWD/$OUTPUT_ROOT"
 fi
 
 prepare_engine_checkout() {

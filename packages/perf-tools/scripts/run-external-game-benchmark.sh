@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+INVOCATION_CWD="$(pwd)"
 
 GAME_DIR=""
 PRESET=""
@@ -129,6 +130,10 @@ fi
 if [[ ! -f "$GAME_DIR/package.json" ]]; then
   echo "Error: no package.json found in $GAME_DIR" >&2
   exit 1
+fi
+
+if [[ -n "$OUTPUT" && "$OUTPUT" != /* ]]; then
+  OUTPUT="$INVOCATION_CWD/$OUTPUT"
 fi
 
 SERVER_PID=""
