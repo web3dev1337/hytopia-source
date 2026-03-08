@@ -12,11 +12,18 @@ import SceneUIManager from '@/worlds/ui/SceneUIManager';
 import Serializer from '@/networking/Serializer';
 import Simulation from '@/worlds/physics/Simulation';
 import WorldLoop from '@/worlds/WorldLoop';
+import fs from 'fs';
+import path from 'path';
+import WorldMapCodec from '@/worlds/maps/WorldMapCodec';
+import WorldMapChunkCacheCodec from '@/worlds/maps/WorldMapChunkCacheCodec';
+import WorldMapFileLoader from '@/worlds/maps/WorldMapFileLoader';
 import { BLOCK_ROTATIONS } from '@/worlds/blocks/Block';
 import type { BlockTypeOptions } from '@/worlds/blocks/BlockType';
 import type { EntityOptions } from '@/worlds/entities/Entity';
 import type RgbColor from '@/shared/types/RgbColor';
 import type Vector3Like from '@/shared/types/math/Vector3Like';
+import type { CompressedWorldMap } from '@/worlds/maps/WorldMapCodec';
+import type { WorldMapChunkCache } from '@/worlds/maps/WorldMapChunkCacheCodec';
 
 /**
  * A map representation for initializing a world.
@@ -95,7 +102,7 @@ export interface WorldOptions {
   fogNear?: number;
 
   /** The map of the world. */
-  map?: WorldMap;
+  map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
 
   /** The name of the world. */
   name: string;
@@ -500,13 +507,42 @@ export default class World extends EventRouter implements protocol.Serializable 
    * - Registers block types from the map into `World.blockTypeRegistry`.
    * - Spawns map entities as `isEnvironmental: true` by default.
    *
-   * @param map - The map to load.
+   * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+   *   WorldMapChunkCache) or a string file path. When a string is provided,
+   *   WorldMapFileLoader auto-detects the best available format.
    *
    * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
    *
    * **Category:** Core
    */
-  public loadMap(map: WorldMap) {
+  public loadMap(
+    map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string,
+    options: { spawnEntities?: boolean; preferMapArtifacts?: boolean } = {},
+  ) {
+    if (typeof map === 'string') {
+      map = WorldMapFileLoader.load(map);
+    }
+
+    // Auto-upgrade: if a legacy WorldMap was passed but compressed artifacts exist, prefer those.
+    const preferMapArtifacts = options.preferMapArtifacts ?? true;
+    if (preferMapArtifacts && !WorldMapCodec.isCompressedWorldMap(map) && !WorldMapChunkCacheCodec.isWorldMapChunkCache(map) && typeof map === 'object' && map !== null && 'blocks' in map) {
+      const basePath = path.resolve(process.cwd(), 'assets/map');
+      const chunkCachePath = basePath + '.chunks.bin';
+      const compressedPath = basePath + '.compressed.json';
+      const jsonPath = basePath + '.json';
+
+      if (fs.existsSync(jsonPath) && (fs.existsSync(chunkCachePath) || fs.existsSync(compressedPath))) {
+        map = WorldMapFileLoader.load('assets/map.json');
+      }
+    }
+
+    // Decompress if needed
+    if (WorldMapCodec.isCompressedWorldMap(map)) {
+      map = WorldMapCodec.decompressToWorldMap(map);
+    } else if (WorldMapChunkCacheCodec.isWorldMapChunkCache(map)) {
+      map = WorldMapChunkCacheCodec.decompressToWorldMap(map);
+    }
+
     // Clear any prior map
     this.chunkLattice.clear();
 
@@ -554,7 +590,8 @@ export default class World extends EventRouter implements protocol.Serializable 
     }
 
     // load map entities
-    if (map.entities) {
+    const spawnEntities = options.spawnEntities ?? true;
+    if (spawnEntities && map.entities) {
       for (const key in map.entities) {
         const entityOptions = map.entities[key];
         const i1 = key.indexOf(',');

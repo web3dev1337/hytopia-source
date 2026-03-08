@@ -1,0 +1,26 @@
+name: "join-storm"
+description: "Preload a large map, then connect many clients at once to stress join chunk sync + serialization"
+warmupMs: 5000
+phases:
+  - name: preload-world
+    actions:
+      - type: clear_world
+      - type: load_map
+        mapPath: "assets/maps/boilerplate.json"
+  - name: stabilize
+    duration: 10s
+  - name: join-and-measure
+    collect: true
+    actions:
+      - type: connect_clients
+        count: 100
+    duration: 60s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  network:
+    maxBytesPerSecond: 80000000
+  memory_mb:
+    max: 2000
+

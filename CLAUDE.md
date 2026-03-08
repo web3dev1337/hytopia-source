@@ -20,7 +20,7 @@ HYTOPIA is a multiplayer voxel game engine monorepo. The **server** (TypeScript/
 - **Physics**: Rapier3D (`@dimforge/rapier3d-simd-compat`) at 60 Hz, default gravity `y = -32`
 - **Networking**: WebTransport (QUIC) preferred, WebSocket fallback. Packets serialized with msgpackr, large payloads gzip-compressed
 - **Protocol**: `protocol/` defines all packet schemas (AJV-validated). Published as `@hytopia.com/server-protocol`
-- **Rendering**: Three.js `WebGLRenderer` + `MeshBasicMaterial` (no dynamic lights). Post-processing: SMAA, bloom, outline. Chunk meshes built in Web Worker via greedy meshing + AO
+- **Rendering**: Three.js `WebGLRenderer` + `MeshBasicMaterial` (no dynamic lights). Post-processing: SMAA, bloom, outline. Chunk meshes built in a Web Worker with face culling + AO (no greedy quad merging)
 - **Persistence**: `@hytopia.com/save-states` for player/global KV data
 - **Singleton pattern**: Most server systems use `ClassName.instance`; client systems owned by `Game` singleton
 

@@ -1,0 +1,28 @@
+name: "stress-test"
+description: "Stress test with 100 bots performing various actions"
+warmupMs: 5000
+phases:
+  - name: spawn-entities
+    actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
+      - type: spawn_bots
+        count: 50
+        behavior: random_walk
+      - type: spawn_bots
+        count: 30
+        behavior: chase
+      - type: spawn_bots
+        count: 20
+        behavior: interact
+  - name: stabilize
+    duration: 5s
+  - name: measure
+    duration: 60s
+    collect: true
+thresholds:
+  tick_duration_ms:
+    avg: 12
+    p99: 20
+  memory_mb:
+    max: 500

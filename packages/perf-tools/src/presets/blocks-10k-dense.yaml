@@ -1,0 +1,26 @@
+name: "blocks-10k-dense"
+description: "Generate ~10k blocks (dense fill) and connect clients to measure join chunk sync overhead"
+warmupMs: 5000
+phases:
+  - name: setup-world
+    actions:
+      - type: clear_world
+      - type: generate_blocks
+        blockCount: 10000
+        blockTypeId: 1
+        layout: dense
+  - name: stabilize
+    duration: 5s
+  - name: join-and-measure
+    collect: true
+    actions:
+      - type: connect_clients
+        count: 50
+    duration: 30s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  memory_mb:
+    max: 2000
+

@@ -1,0 +1,90 @@
+name: "zoo-game-observe"
+description: "Zoo Game observation run: 5 real benchmark clients join, each /fillzoo their own zoo, then move during a long measured phase"
+browserClients: 5
+warmupMs: 5000
+phases:
+  - name: setup-zoo
+    actions:
+      - type: despawn_bots
+      - type: send_chat
+        message: "/fillzoo"
+        durationMs: 3000
+        target: all
+        staggerMs: 750
+  - name: wait-for-world
+    actions:
+      - type: wait_for_entities
+        count: 25
+        durationMs: 45000
+      - type: wait
+        durationMs: 5000
+  - name: walkthrough
+    collect: true
+    duration: 5m
+    actions:
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 500
+        target: all
+        staggerMs: 500
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+        target: all
+        staggerMs: 500
+      - type: set_camera
+        yaw: -1.57
+        pitch: 0.3
+        durationMs: 300
+        target: all
+        staggerMs: 500
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+        target: all
+        staggerMs: 500
+      - type: set_camera
+        yaw: 3.14
+        pitch: 0.3
+        durationMs: 300
+        target: all
+        staggerMs: 500
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+        target: all
+        staggerMs: 500
+      - type: set_camera
+        yaw: 1.57
+        pitch: 0.3
+        durationMs: 300
+        target: all
+        staggerMs: 500
+      - type: walk_player
+        durationMs: 4000
+        options: { key: w }
+        target: all
+        staggerMs: 500
+      - type: set_camera
+        yaw: 0
+        pitch: 0.3
+        durationMs: 300
+        target: all
+        staggerMs: 500
+      - type: walk_player
+        durationMs: 5000
+        options: { key: w }
+        target: all
+        staggerMs: 500
+thresholds:
+  tick_duration_ms:
+    avg: 16
+    p99: 30
+  memory_mb:
+    max: 768
+  client:
+    fps_avg: 10
+    draw_calls_max: 500
+    triangles_max: 3000000
+    frame_time_ms_max: 300

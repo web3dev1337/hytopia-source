@@ -1,4 +1,5 @@
 import ErrorHandler from '@/errors/ErrorHandler';
+import PerformanceMonitor from '@/metrics/PerformanceMonitor';
 import PlayerEntity from '@/worlds/entities/PlayerEntity';
 import type Entity from '@/worlds/entities/Entity';
 import type Player from '@/players/Player';
@@ -214,8 +215,17 @@ export default class EntityManager {
 
   /** @internal */
   public tickEntities(tickDeltaMs: number): void {
+    const perfMon = PerformanceMonitor.instance;
+    const entityProfiling = perfMon.isEntityProfilingEnabled;
+
     for (const entity of this._activeEntities) {
-      entity.tick(tickDeltaMs);
+      if (entityProfiling) {
+        const start = performance.now();
+        entity.tick(tickDeltaMs);
+        perfMon.recordEntityCost(entity.id ?? 0, entity.name, performance.now() - start);
+      } else {
+        entity.tick(tickDeltaMs);
+      }
     }
   }
 

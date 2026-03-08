@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node';
+import PerformanceMonitor from '@/metrics/PerformanceMonitor';
 import { SDK_VERSION } from '@/networking/WebServer';
 
 /**
@@ -222,15 +223,31 @@ export default class Telemetry {
    * **Category:** Telemetry
    */
   public static startSpan<T>(options: TelemetrySpanOptions, callback: (span?: Sentry.Span) => T): T {
+    const perfMon = PerformanceMonitor.instance;
+
+    if (perfMon.isEnabled) {
+      if (Sentry.isInitialized()) {
+        return perfMon.measure(options.operation, () =>
+          Sentry.startSpan({
+            attributes: options.attributes,
+            name: options.operation,
+            op: options.operation,
+          }, callback),
+        );
+      }
+
+      return perfMon.measure(options.operation, () => callback());
+    }
+
     if (Sentry.isInitialized()) {
       return Sentry.startSpan({
         attributes: options.attributes,
         name: options.operation,
         op: options.operation,
       }, callback);
-    } else {
-      return callback();
     }
+
+    return callback();
   }
 
   /**

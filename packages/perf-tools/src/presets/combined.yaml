@@ -1,0 +1,31 @@
+name: "combined-stress"
+description: "Combined stress test - large world, many bots, block interactions, all at once"
+clients: 10
+warmupMs: 10000
+phases:
+  - name: load-world
+    actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate.json"
+  - name: spawn-all
+    actions:
+      - type: spawn_bots
+        count: 50
+        behavior: random_walk
+      - type: spawn_bots
+        count: 30
+        behavior: chase
+      - type: spawn_bots
+        count: 20
+        behavior: interact
+  - name: stabilize
+    duration: 10s
+  - name: measure
+    duration: 120s
+    collect: true
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  memory_mb:
+    max: 1500

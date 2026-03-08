@@ -1,6 +1,25 @@
 // AssetsLibrary
 export { default as AssetsLibrary } from '@/assets/AssetsLibrary';
 
+// BotManager
+export { default as BotManager } from '@/bots/BotManager';
+
+// BotPlayer
+export { default as BotPlayer } from '@/bots/BotPlayer';
+export type { BotBehavior, BotPlayerOptions } from '@/bots/BotPlayer';
+
+// Bot Behaviors
+export { default as IdleBehavior } from '@/bots/behaviors/IdleBehavior';
+export { default as RandomWalkBehavior } from '@/bots/behaviors/RandomWalkBehavior';
+export type { RandomWalkOptions } from '@/bots/behaviors/RandomWalkBehavior';
+export { default as ChaseBehavior } from '@/bots/behaviors/ChaseBehavior';
+export type { ChaseBehaviorOptions } from '@/bots/behaviors/ChaseBehavior';
+export { default as InteractBehavior } from '@/bots/behaviors/InteractBehavior';
+export type { InteractBehaviorOptions } from '@/bots/behaviors/InteractBehavior';
+
+// CpuProfiler
+export { default as CpuProfiler } from '@/metrics/CpuProfiler';
+
 // Audio
 export { default as Audio, AudioEvent } from '@/worlds/audios/Audio';
 export type { AudioEventPayloads, AudioOptions } from '@/worlds/audios/Audio';
@@ -112,6 +131,13 @@ export type { default as Vector3Like } from '@/shared/types/math/Vector3Like';
 export { default as ModelRegistry } from '@/models/ModelRegistry';
 export type { ModelBoundingBox, ModelTrimesh } from '@/models/ModelRegistry';
 
+// Monitor (Performance Decorators)
+export { Monitor, MonitorClass, monitorBlock, monitorAsyncBlock } from '@/metrics/Monitor';
+
+// NetworkMetrics
+export { default as NetworkMetrics } from '@/metrics/NetworkMetrics';
+export type { NetworkMetricsSnapshot } from '@/metrics/NetworkMetrics';
+
 // ParticleEmitter
 export { default as ParticleEmitter, ParticleEmitterEvent } from '@/worlds/particles/ParticleEmitter';
 export type { ParticleEmitterEventPayloads, ParticleEmitterOptions, ParticleEmitterOrientation } from '@/worlds/particles/ParticleEmitter';
@@ -122,6 +148,10 @@ export { default as ParticleEmitterManager } from '@/worlds/particles/ParticleEm
 // PathfindingEntityController
 export { default as PathfindingEntityController } from '@/worlds/entities/controllers/PathfindingEntityController';
 export type { PathfindAbortCallback, PathfindCompleteCallback, PathfindingOptions, WaypointMoveCompleteCallback, WaypointMoveSkippedCallback } from '@/worlds/entities/controllers/PathfindingEntityController';
+
+// PerformanceMonitor
+export { default as PerformanceMonitor, PerformanceMonitorEvent } from '@/metrics/PerformanceMonitor';
+export type { OperationStats, TickReport, PerformanceSnapshot, PerformanceMonitorOptions, PerformanceMonitorEventPayloads } from '@/metrics/PerformanceMonitor';
 
 // PersistenceManager
 export { default as PersistenceManager } from '@/persistence/PersistenceManager';
@@ -181,6 +211,28 @@ export { default as WebServer, WebServerEvent } from '@/networking/WebServer';
 // World
 export { default as World, WorldEvent } from '@/worlds/World';
 export type { WorldEventPayloads, WorldMap, WorldOptions } from '@/worlds/World';
+
+// WorldMapCodec
+export { default as WorldMapCodec } from '@/worlds/maps/WorldMapCodec';
+export type { CompressedWorldMap, CompressWorldMapOptions, CompressedWorldMapAlgorithm } from '@/worlds/maps/WorldMapCodec';
+
+// WorldMapChunkCacheCodec
+export { default as WorldMapChunkCacheCodec } from '@/worlds/maps/WorldMapChunkCacheCodec';
+export type {
+  WorldMapChunkCache,
+  WorldMapChunkCacheAlgorithm,
+  WorldMapChunkCacheMetadata,
+  WorldMapChunkCacheOptions,
+  CreateWorldMapChunkCacheOptions,
+} from '@/worlds/maps/WorldMapChunkCacheCodec';
+
+// WorldMapFileLoader
+export { default as WorldMapFileLoader } from '@/worlds/maps/WorldMapFileLoader';
+export type { AnyWorldMap } from '@/worlds/maps/WorldMapFileLoader';
+
+// WorldMapArtifactsGenerator
+export { default as WorldMapArtifactsGenerator } from '@/worlds/maps/WorldMapArtifacts';
+export type { WorldMapArtifacts } from '@/worlds/maps/WorldMapArtifacts';
 
 // WorldLoop
 export { default as WorldLoop, WorldLoopEvent } from '@/worlds/WorldLoop';

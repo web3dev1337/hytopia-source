@@ -1,0 +1,30 @@
+name: "block-churn"
+description: "Continuous block edits to stress colliders + block sync packets"
+warmupMs: 5000
+phases:
+  - name: setup
+    actions:
+      - type: clear_world
+      - type: load_map
+        mapPath: "assets/maps/boilerplate-small.json"
+      - type: connect_clients
+        count: 10
+  - name: churn-and-measure
+    collect: true
+    actions:
+      - type: start_block_churn
+        blocksPerTick: 200
+        blockTypeId: 1
+        mode: toggle
+        min: { x: -16, y: 1, z: -16 }
+        max: { x: 16, y: 5, z: 16 }
+    duration: 60s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  network:
+    maxBytesPerSecond: 15000000
+  memory_mb:
+    max: 1500
+

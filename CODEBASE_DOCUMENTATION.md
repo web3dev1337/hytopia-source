@@ -16,6 +16,7 @@ PROTOCOL: protocol/ - Packet schemas + definitions (@hytopia.com/server-protocol
 SDK:      sdk/ - Git submodule → hytopiagg/sdk (build output lands here)
 EXAMPLES: sdk-examples/ - Reference games built with the SDK
 ASSETS:   assets/release/ - Default game assets (audio, blocks, maps, models, particles, skyboxes, ui)
+PERF:     packages/perf-tools/ - Benchmark CLI + trace analysis (`hytopia-bench`), headless client metrics, synthetic + real-game presets (`zoo-game-full` single-client benchmark, `zoo-game-observe` 5-client joinable Zoo run), helper scripts for linking/running external games (including linked SDK runtime deps, target-ref dependency prep via `ensure-node-modules.sh`, `apply-instrumentation-overlay.sh` for temporary legacy-ref PerfBridge/PerfHarness patching, `overlays/legacy-server/` for older PerfBaseline refs, `overlays/minimal-server/` for telemetry-minimal refs that need injected monitor/network hooks, repeatable HyFire2/Zoo Game workflows, and `run-owned-stack-suite.sh` for one-command multi-game runs against a chosen engine ref/PR with `origin`/`upstream` fetch fallback). The perf CLI now supports repeated-run median workflows via `BenchmarkSeriesAggregator.ts`, `hytopia-bench aggregate`, `hytopia-bench compare-series`, and `run-owned-stack-suite.sh --repeat <n>`, so noisy real-game/client scenarios can be judged on stable medians instead of one-off runs. Older engine refs now prefer overlayed client/server perf hooks, normalize report outputs to stable paths, then fall back to validated legacy `/__perf` normalization plus compare-time metric skipping instead of misleading zero baselines.
 CONFIG:   package.json - Monorepo root (npm workspaces)
           server/package.json - Server deps + build scripts
           server/tsconfig.json - Strict TS, path alias @/* → ./src/*
@@ -140,9 +141,18 @@ shared/types/math/Vector3Like.ts - Vector3 interface
 errors/ErrorHandler.ts - Fatal error handling + crash protection
 events/EventRouter.ts - Typed event emitter (eventemitter3)
 events/Events.ts - Event payload type definitions
+bots/BotManager.ts, bots/BotPlayer.ts - Server-side bot players for perf/stress tests
+metrics/Monitor.ts - @Monitor decorators + helper wrappers
+metrics/CpuProfiler.ts - V8 CPU profile + heap snapshot capture (debug tooling)
+metrics/PerformanceMonitor.ts - Tick profiler + operation percentiles + spikes
+metrics/NetworkMetrics.ts - Byte/packet/serialization counters
 metrics/Telemetry.ts - Span-based performance profiling
 models/ModelRegistry.ts - GLTF model preloading + bounding box extraction
 persistence/PersistenceManager.ts - Player/global KV storage via @hytopia.com/save-states
+perf/PerfHarness.ts - Env-gated /__perf endpoints for perf-tools
+perf/PerfBlockChurner.ts - Tick-driven block churn stressor (perf-tools)
+perf/PerfWorldGenerator.ts - Synthetic block-world generator for perf-tools scenarios
+perf/perf-harness.ts - Benchmark server entry (build:perf-harness → src/perf-harness.mjs)
 server/src/assets/AssetsLibrary.ts - Asset path resolution
 ```
 
@@ -423,4 +433,4 @@ zombies-fps/ - Zombie FPS
 - **Dual transport** — WebTransport (QUIC) preferred, WebSocket fallback. Reliable stream + unreliable datagrams
 - **msgpackr serialization** — All packets serialized with msgpackr, large payloads gzip-compressed
 - **60 Hz physics / 30 Hz network** — Server physics ticks at 60 Hz, network sync flushes every 2 ticks
-- **Web Worker meshing** — Client offloads greedy meshing + AO to a dedicated Web Worker
+- **Web Worker meshing** — Client offloads face-culling meshing + AO to a dedicated Web Worker (no greedy quad merging)

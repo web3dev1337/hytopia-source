@@ -91,6 +91,7 @@ export default class NetworkSynchronizer {
   private _loadedSceneUIs: Set<number> = new Set();
   private _spawnedChunks: Set<string> = new Set();
   private _spawnedEntities: Set<number> = new Set();
+  private _playersInWorld: Set<Player> = new Set();
 
   private _world: World;
   
@@ -538,6 +539,10 @@ export default class NetworkSynchronizer {
   };
 
   private _onBlockTypeRegistryRegisterBlockType = (payload: EventPayloads[BlockTypeRegistryEvent.REGISTER_BLOCK_TYPE]) => {
+    if (this._playersInWorld.size === 0) {
+      return;
+    }
+
     const blockTypeSync = this._createOrGetQueuedBlockTypeSync(payload.blockType);
     Object.assign(blockTypeSync, payload.blockType.serialize());
   };
@@ -553,6 +558,10 @@ export default class NetworkSynchronizer {
   };
 
   private _onChunkLatticeAddChunk = (payload: EventPayloads[ChunkLatticeEvent.ADD_CHUNK]) => {
+    if (this._playersInWorld.size === 0) {
+      return;
+    }
+
     const chunkSync = this._createOrGetQueuedChunkSync(payload.chunk);
     Object.assign(chunkSync, payload.chunk.serialize());
     chunkSync.rm = undefined;
@@ -561,6 +570,10 @@ export default class NetworkSynchronizer {
   };
 
   private _onChunkLatticeRemoveChunk = (payload: EventPayloads[ChunkLatticeEvent.REMOVE_CHUNK]) => {
+    if (this._playersInWorld.size === 0) {
+      return;
+    }
+
     const chunkSync = this._createOrGetQueuedChunkSync(payload.chunk);
     const chunkKey = chunkSync.c.join(',');
 
@@ -573,6 +586,10 @@ export default class NetworkSynchronizer {
   };
 
   private _onChunkLatticeSetBlock = (payload: EventPayloads[ChunkLatticeEvent.SET_BLOCK]) => {
+    if (this._playersInWorld.size === 0) {
+      return;
+    }
+
     const blockSync = this._createOrGetQueuedBlockSync(payload.globalCoordinate);
     blockSync.i = payload.blockTypeId;
     blockSync.r = payload.blockRotation?.enumIndex;
@@ -1083,6 +1100,7 @@ export default class NetworkSynchronizer {
 
   private _onPlayerJoinedWorld = (payload: EventPayloads[PlayerEvent.JOINED_WORLD]) => {
     const { player } = payload;
+    this._playersInWorld.add(player);
 
     // Order doesn't matter here - synchronize() handles send order.
     // Use _assignUndefined to avoid overwriting properties already set by other event handlers.
@@ -1149,6 +1167,7 @@ export default class NetworkSynchronizer {
   };
 
   private _onPlayerLeftWorld = (payload: EventPayloads[PlayerEvent.LEFT_WORLD]) => {
+    this._playersInWorld.delete(payload.player);
     const playerSync = this._createOrGetQueuedPlayerSync(payload.player);
     playerSync.rm = true;
   };

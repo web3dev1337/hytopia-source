@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-03-05T10:12:51.999Z",
+  "scenario": "idle-baseline",
+  "durationMs": 34964,
+  "baseline": {
+    "avgTickMs": 0.04679685049276594,
+    "maxTickMs": 0.7618509999992966,
+    "p95TickMs": 0.08563006666624157,
+    "p99TickMs": 0.14175990000006397,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 40.66230392456055,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.0013375285718636284,
+        "p95Ms": 0.0020908666665794347
+      },
+      "physics_step": {
+        "avgMs": 0.02362913038497697,
+        "p95Ms": 0.037648333333769796
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0029344255942972772,
+        "p95Ms": 0.004569666666156991
+      },
+      "simulation_step": {
+        "avgMs": 0.02947926233473994,
+        "p95Ms": 0.04859916666643282
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.0004343184789922846,
+        "p95Ms": 0.0007068999998409708
+      },
+      "world_tick": {
+        "avgMs": 0.04458446096775077,
+        "p95Ms": 0.07784126666668574
+      },
+      "ticker_tick": {
+        "avgMs": 0.07767732243819857,
+        "p95Ms": 0.125281199999669
+      },
+      "send_all_packets": {
+        "avgMs": 0.003018038009964449,
+        "p95Ms": 0.005092800000026424
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.0021036462653031196,
+        "p95Ms": 0.003053333333173214
+      },
+      "network_synchronize": {
+        "avgMs": 0.012486877813969597,
+        "p95Ms": 0.020697799999864704
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "warmup",
+      "durationMs": 5002,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 29290,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 30,
+    "clientSnapshotCount": 0
+  }
+}

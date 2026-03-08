@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-03-05T10:28:40.896Z",
+  "scenario": "entity-density",
+  "durationMs": 74447,
+  "baseline": {
+    "avgTickMs": 0.35446141580684515,
+    "maxTickMs": 1.217609999992419,
+    "p95TickMs": 0.49880955000010846,
+    "p99TickMs": 0.6524828166667854,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 44.66063092549642,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.016547232843148327,
+        "p95Ms": 0.025251083333538798
+      },
+      "physics_step": {
+        "avgMs": 0.13449901648284898,
+        "p95Ms": 0.18499565000129223
+      },
+      "physics_cleanup": {
+        "avgMs": 0.002322116057727884,
+        "p95Ms": 0.0033113166655918272
+      },
+      "simulation_step": {
+        "avgMs": 0.1396163369787168,
+        "p95Ms": 0.19289864999897569
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.1810740421472613,
+        "p95Ms": 0.2781539166659362
+      },
+      "send_all_packets": {
+        "avgMs": 0.0023587110905412306,
+        "p95Ms": 0.0033070833336751094
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.004359490449905124,
+        "p95Ms": 0.005840849999397809
+      },
+      "network_synchronize": {
+        "avgMs": 0.01736202156468164,
+        "p95Ms": 0.024285166667020044
+      },
+      "world_tick": {
+        "avgMs": 0.35252660842303335,
+        "p95Ms": 0.4856061166657431
+      },
+      "ticker_tick": {
+        "avgMs": 0.3828609000750609,
+        "p95Ms": 0.5241929000011017
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "setup",
+      "durationMs": 181,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 10008,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 58586,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}

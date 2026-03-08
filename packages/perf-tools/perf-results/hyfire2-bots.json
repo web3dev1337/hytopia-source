@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-03-06T01:53:07.938Z",
+  "scenario": "hyfire2-5v5-bots",
+  "durationMs": 127350,
+  "baseline": {
+    "avgTickMs": 0.6116902903423317,
+    "maxTickMs": 4.948454999997921,
+    "p95TickMs": 0.9835920000003474,
+    "p99TickMs": 1.344567283334133,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 431.2618334452311,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.12454038554854553,
+        "p95Ms": 0.2443331750001562
+      },
+      "physics_step": {
+        "avgMs": 0.3350736570206461,
+        "p95Ms": 0.5066266583330313
+      },
+      "physics_cleanup": {
+        "avgMs": 0.027295186411969395,
+        "p95Ms": 0.0715296166665515
+      },
+      "simulation_step": {
+        "avgMs": 0.3755244878669753,
+        "p95Ms": 0.5872315416670669
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.060598101468648656,
+        "p95Ms": 0.12497561666705223
+      },
+      "world_tick": {
+        "avgMs": 0.60986325870331,
+        "p95Ms": 0.9896887249994203
+      },
+      "ticker_tick": {
+        "avgMs": 0.7101404462850199,
+        "p95Ms": 1.1395172916672587
+      },
+      "send_all_packets": {
+        "avgMs": 0.010002776939347363,
+        "p95Ms": 0.046211291667653615
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.009550561731046783,
+        "p95Ms": 0.022571483332770488
+      },
+      "network_synchronize": {
+        "avgMs": 0.058481402331304756,
+        "p95Ms": 0.11953782499943676
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "gameplay",
+      "durationMs": 108694,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 120,
+    "clientSnapshotCount": 0
+  }
+}

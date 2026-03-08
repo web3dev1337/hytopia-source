@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-03-06T02:14:26.782Z",
+  "scenario": "zoo-game-18-bots",
+  "durationMs": 129558,
+  "baseline": {
+    "avgTickMs": 0.2549325841085261,
+    "maxTickMs": 2.073420000000624,
+    "p95TickMs": 0.6464003333326218,
+    "p99TickMs": 0.8528039666671854,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 313.16300671895345,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.04462002311489062,
+        "p95Ms": 0.13042361666618188
+      },
+      "physics_step": {
+        "avgMs": 0.11469806608628241,
+        "p95Ms": 0.2668681666667908
+      },
+      "physics_cleanup": {
+        "avgMs": 0.0021119560521985978,
+        "p95Ms": 0.0033652583335727587
+      },
+      "simulation_step": {
+        "avgMs": 0.11956885418414905,
+        "p95Ms": 0.2744475249994442
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.06976556052305873,
+        "p95Ms": 0.20276147499901828
+      },
+      "send_all_packets": {
+        "avgMs": 0.0018747430761021815,
+        "p95Ms": 0.003443375000976327
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.003389591343193421,
+        "p95Ms": 0.005195633333914884
+      },
+      "network_synchronize": {
+        "avgMs": 0.027452826833688247,
+        "p95Ms": 0.06792570833273809
+      },
+      "world_tick": {
+        "avgMs": 0.25370135807671634,
+        "p95Ms": 0.6378724583342167
+      },
+      "ticker_tick": {
+        "avgMs": 0.2883600087509416,
+        "p95Ms": 0.6806504083335312
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "gameplay",
+      "durationMs": 108824,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 120,
+    "clientSnapshotCount": 0
+  }
+}

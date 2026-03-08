@@ -18,6 +18,9 @@ import type { Socket } from 'net';
 import { WebSocket as WebSocket_2 } from 'ws';
 import type { WebTransportSessionImpl } from '@fails-components/webtransport/dist/lib/types';
 
+// @public (undocumented)
+export type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
+
 // @public
 export class AssetsLibrary {
     static readonly assetsLibraryPath: string | null;
@@ -514,12 +517,100 @@ export interface BlockTypeRegistryEventPayloads {
     };
 }
 
+// @public (undocumented)
+export interface BotBehavior {
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export class BotManager {
+    // (undocumented)
+    get botCount(): number;
+    // (undocumented)
+    despawnAll(): void;
+    // (undocumented)
+    despawnBot(id: number): void;
+    // (undocumented)
+    getAllBots(): BotPlayer[];
+    // (undocumented)
+    getBot(id: number): BotPlayer | undefined;
+    // (undocumented)
+    static get instance(): BotManager;
+    // (undocumented)
+    spawnBot(world: World, options?: BotPlayerOptions): BotPlayer;
+    // (undocumented)
+    spawnBots(world: World, count: number, options?: BotPlayerOptions): BotPlayer[];
+}
+
+// @public (undocumented)
+export class BotPlayer {
+    constructor(world: World, options?: BotPlayerOptions);
+    // (undocumented)
+    get controller(): SimpleEntityController;
+    // (undocumented)
+    despawn(): void;
+    // (undocumented)
+    readonly entity: Entity;
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    get isSpawned(): boolean;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    setBehavior(behavior: BotBehavior): void;
+    // (undocumented)
+    spawn(position?: Vector3Like): void;
+    // (undocumented)
+    teleport(position: Vector3Like): void;
+    // (undocumented)
+    get world(): World;
+}
+
+// @public (undocumented)
+export interface BotPlayerOptions {
+    // (undocumented)
+    behavior?: BotBehavior;
+    // (undocumented)
+    modelScale?: number;
+    // (undocumented)
+    modelUri?: string;
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    rigidBodyType?: RigidBodyType;
+    // (undocumented)
+    spawnPosition?: Vector3Like;
+}
+
 // @public
 export interface CapsuleColliderOptions extends BaseColliderOptions {
     halfHeight?: number;
     radius?: number;
     // (undocumented)
     shape: ColliderShape.CAPSULE;
+}
+
+// @public (undocumented)
+export class ChaseBehavior implements BotBehavior {
+    constructor(options?: ChaseBehaviorOptions);
+    // (undocumented)
+    readonly name = "chase";
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface ChaseBehaviorOptions {
+    // (undocumented)
+    chaseSpeed?: number;
+    // (undocumented)
+    detectionRadius?: number;
+    // (undocumented)
+    updateIntervalMs?: number;
 }
 
 // @public
@@ -839,6 +930,49 @@ export type CollisionObject = BlockType | Entity | CollisionCallback;
 // @public
 export type CommandCallback = (player: Player, args: string[], message: string) => void;
 
+// @public (undocumented)
+export interface CompressedWorldMap {
+    // (undocumented)
+    algorithm?: CompressedWorldMapAlgorithm;
+    // (undocumented)
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    // Warning: (ae-forgotten-export) The symbol "CompressedWorldMapBounds" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    bounds: CompressedWorldMapBounds;
+    // (undocumented)
+    codecVersion?: number;
+    // (undocumented)
+    data: string;
+    // (undocumented)
+    entities?: WorldMap['entities'];
+    // (undocumented)
+    format?: 'hytopia.worldmap.compressed';
+    // (undocumented)
+    mapVersion?: unknown;
+    // (undocumented)
+    metadata?: unknown;
+    // Warning: (ae-forgotten-export) The symbol "CompressedWorldMapOptions" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    options?: CompressedWorldMapOptions;
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+export type CompressedWorldMapAlgorithm = 'brotli' | 'gzip' | 'none';
+
+// @public (undocumented)
+export interface CompressWorldMapOptions {
+    // (undocumented)
+    algorithm?: CompressedWorldMapAlgorithm;
+    // (undocumented)
+    includeRotations?: boolean;
+    // (undocumented)
+    level?: number;
+}
+
 // @public
 export interface ConeColliderOptions extends BaseColliderOptions {
     halfHeight?: number;
@@ -862,6 +996,26 @@ export type ContactManifold = {
     localNormalB: Vector3Like;
     normal: Vector3Like;
 };
+
+// @public (undocumented)
+export class CpuProfiler {
+    // (undocumented)
+    static captureHeapSnapshot(outputPath?: string): Promise<string>;
+    // (undocumented)
+    static captureProfile(durationMs: number, outputPath?: string): Promise<object | null>;
+}
+
+// @public (undocumented)
+export interface CreateWorldMapChunkCacheOptions {
+    // (undocumented)
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    // (undocumented)
+    includeRotations?: boolean;
+    // (undocumented)
+    level?: number;
+    // (undocumented)
+    sourceSha256?: string;
+}
 
 // @public
 export interface CylinderColliderOptions extends BaseColliderOptions {
@@ -1030,6 +1184,9 @@ export class Entity extends RigidBody implements protocol.Serializable {
     setBlockTextureUri(blockTextureUri: string | undefined): void;
     setEmissiveColor(emissiveColor: RgbColor | undefined): void;
     setEmissiveIntensity(emissiveIntensity: number | undefined): void;
+    setModelAnimationsPlaybackRate(playbackRate: number): void;
+    setModelNodeEmissiveColor(nodeName: string, color: RgbColor | undefined): void;
+    setModelNodeEmissiveIntensity(nodeName: string, intensity: number | undefined): void;
     setModelScale(modelScale: Vector3Like | number): void;
     setModelScaleInterpolationMs(interpolationMs: number | undefined): void;
     setModelTextureUri(modelTextureUri: string | undefined): void;
@@ -1040,6 +1197,8 @@ export class Entity extends RigidBody implements protocol.Serializable {
     setRotationInterpolationMs(interpolationMs: number | undefined): void;
     setTintColor(tintColor: RgbColor | undefined): void;
     spawn(world: World, position: Vector3Like, rotation?: QuaternionLike): void;
+    startModelLoopedAnimations(names: readonly string[]): void;
+    startModelOneshotAnimations(names: readonly string[]): void;
     stopAllModelAnimations(exclusionFilter?: (modelAnimation: Readonly<EntityModelAnimation>) => boolean): void;
     stopModelAnimations(modelAnimationNames: readonly string[]): void;
     get tag(): string | undefined;
@@ -1608,6 +1767,33 @@ export interface GameServerEventPayloads {
     };
 }
 
+// @public (undocumented)
+export class IdleBehavior implements BotBehavior {
+    // (undocumented)
+    readonly name = "idle";
+    // (undocumented)
+    tick(_bot: BotPlayer, _world: World, _deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export class InteractBehavior implements BotBehavior {
+    constructor(options?: InteractBehaviorOptions);
+    // (undocumented)
+    readonly name = "interact";
+    // (undocumented)
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface InteractBehaviorOptions {
+    // (undocumented)
+    actionIntervalMs?: number;
+    // (undocumented)
+    interactRadius?: number;
+    // (undocumented)
+    moveSpeed?: number;
+}
+
 // @public
 export type IntersectionResult = {
     intersectedBlockType?: BlockType;
@@ -1780,6 +1966,20 @@ export type ModelTrimesh = {
     indices: Uint32Array;
 };
 
+// @public (undocumented)
+export function Monitor(operationName?: string): MethodDecorator;
+
+// @public (undocumented)
+export function monitorAsyncBlock<T>(name: string, fn: () => Promise<T>): Promise<T>;
+
+// @public (undocumented)
+export function monitorBlock<T>(name: string, fn: () => T): T;
+
+// Warning: (ae-forgotten-export) The symbol "AnyConstructor" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function MonitorClass(prefix?: string): <TConstructor extends AnyConstructor>(constructor: TConstructor) => TConstructor;
+
 // @public
 export type MoveCallback = (currentPosition: Vector3Like, targetPosition: Vector3Like) => void;
 
@@ -1800,10 +2000,84 @@ export type MoveOptions = {
     moveCompletesWhenStuck?: boolean;
 };
 
+// @public (undocumented)
+export class NetworkMetrics {
+    // (undocumented)
+    disable(): void;
+    // (undocumented)
+    enable(): void;
+    // (undocumented)
+    getSnapshot(): NetworkMetricsSnapshot;
+    // (undocumented)
+    static get instance(): NetworkMetrics;
+    // (undocumented)
+    get isEnabled(): boolean;
+    // (undocumented)
+    recordBytesReceived(bytes: number): void;
+    // (undocumented)
+    recordBytesSent(bytes: number): void;
+    // (undocumented)
+    recordCompression(): void;
+    // (undocumented)
+    recordPacketReceived(): void;
+    // (undocumented)
+    recordPacketSent(): void;
+    // (undocumented)
+    recordSerialization(durationMs: number): void;
+    // (undocumented)
+    reset(): void;
+    // (undocumented)
+    setConnectedPlayers(count: number): void;
+}
+
+// @public (undocumented)
+export interface NetworkMetricsSnapshot {
+    // (undocumented)
+    avgSerializationMs: number;
+    // (undocumented)
+    bytesReceivedPerSecond: number;
+    // (undocumented)
+    bytesReceivedTotal: number;
+    // (undocumented)
+    bytesSentPerSecond: number;
+    // (undocumented)
+    bytesSentTotal: number;
+    // (undocumented)
+    compressionCount: number;
+    // (undocumented)
+    connectedPlayers: number;
+    // (undocumented)
+    packetsReceivedPerSecond: number;
+    // (undocumented)
+    packetsSentPerSecond: number;
+}
+
 // @public
 export interface NoneColliderOptions extends BaseColliderOptions {
     // (undocumented)
     shape: ColliderShape.NONE;
+}
+
+// @public (undocumented)
+export interface OperationStats {
+    // (undocumented)
+    avgMs: number;
+    // (undocumented)
+    count: number;
+    // (undocumented)
+    lastMs: number;
+    // (undocumented)
+    maxMs: number;
+    // (undocumented)
+    minMs: number;
+    // (undocumented)
+    p50Ms: number;
+    // (undocumented)
+    p95Ms: number;
+    // (undocumented)
+    p99Ms: number;
+    // (undocumented)
+    totalMs: number;
 }
 
 // @public
@@ -2233,6 +2507,107 @@ export type PathfindingOptions = {
     waypointStoppingDistance?: number;
     waypointTimeoutMs?: number;
 };
+
+// @public (undocumented)
+export class PerformanceMonitor extends EventRouter {
+    // (undocumented)
+    beginTick(tick: number, entityCount: number, playerCount: number, worldId?: number): void;
+    // (undocumented)
+    disable(): void;
+    // (undocumented)
+    enable(options?: PerformanceMonitorOptions): void;
+    // (undocumented)
+    enableEntityProfiling(enabled: boolean): void;
+    // (undocumented)
+    endTick(worldId?: number): void;
+    // (undocumented)
+    getEntityCosts(): Map<number, {
+        tickMs: number;
+        name: string;
+    }>;
+    // (undocumented)
+    getSnapshot(worldId?: number): PerformanceSnapshot;
+    // (undocumented)
+    static get instance(): PerformanceMonitor;
+    // (undocumented)
+    get isEnabled(): boolean;
+    // (undocumented)
+    get isEntityProfilingEnabled(): boolean;
+    // (undocumented)
+    measure<T>(name: string, fn: () => T): T;
+    // (undocumented)
+    measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T>;
+    // (undocumented)
+    recordEntityCost(entityId: number, name: string, tickMs: number): void;
+    // (undocumented)
+    recordPhase(phaseName: string, durationMs: number, worldId?: number): void;
+    // (undocumented)
+    resetStats(): void;
+    // (undocumented)
+    startTiming(name: string): () => void;
+}
+
+// @public (undocumented)
+export enum PerformanceMonitorEvent {
+    // (undocumented)
+    SNAPSHOT = "PERFORMANCE_MONITOR.SNAPSHOT",
+    // (undocumented)
+    SPIKE_DETECTED = "PERFORMANCE_MONITOR.SPIKE_DETECTED",
+    // (undocumented)
+    TICK_REPORT = "PERFORMANCE_MONITOR.TICK_REPORT"
+}
+
+// @public (undocumented)
+export interface PerformanceMonitorEventPayloads {
+    // (undocumented)
+    [PerformanceMonitorEvent.SNAPSHOT]: PerformanceSnapshot;
+    // (undocumented)
+    [PerformanceMonitorEvent.SPIKE_DETECTED]: TickReport;
+    // (undocumented)
+    [PerformanceMonitorEvent.TICK_REPORT]: TickReport;
+}
+
+// @public (undocumented)
+export interface PerformanceMonitorOptions {
+    // (undocumented)
+    historySize?: number;
+    // (undocumented)
+    snapshotIntervalMs?: number;
+    // (undocumented)
+    spikeThresholdMs?: number;
+    // (undocumented)
+    tickBudgetMs?: number;
+}
+
+// @public (undocumented)
+export interface PerformanceSnapshot {
+    // (undocumented)
+    avgTickMs: number;
+    // (undocumented)
+    budgetMs: number;
+    // (undocumented)
+    maxTickMs: number;
+    // (undocumented)
+    memory: {
+        heapUsedMb: number;
+        heapTotalMb: number;
+        rssMb: number;
+    };
+    // (undocumented)
+    operations: Record<string, OperationStats>;
+    // (undocumented)
+    p95TickMs: number;
+    // (undocumented)
+    p99TickMs: number;
+    // (undocumented)
+    tickRate: number;
+    // (undocumented)
+    ticksOverBudget: number;
+    // (undocumented)
+    totalTicks: number;
+    // (undocumented)
+    uptimeMs: number;
+}
 
 // @public
 export class PersistenceManager {
@@ -2727,6 +3102,25 @@ export interface QuaternionLike {
     z: number;
 }
 
+// @public (undocumented)
+export class RandomWalkBehavior implements BotBehavior {
+    constructor(options?: RandomWalkOptions);
+    // (undocumented)
+    readonly name = "random_walk";
+    // (undocumented)
+    tick(bot: BotPlayer, _world: World, deltaTimeMs: number): void;
+}
+
+// @public (undocumented)
+export interface RandomWalkOptions {
+    // (undocumented)
+    changeDirectionIntervalMs?: number;
+    // (undocumented)
+    moveRadius?: number;
+    // (undocumented)
+    moveSpeed?: number;
+}
+
 // @public
 export type RawCollider = RAPIER.Collider;
 
@@ -3135,6 +3529,28 @@ export class Ticker {
     get targetTicksPerSecond(): number;
 }
 
+// @public (undocumented)
+export interface TickReport {
+    // (undocumented)
+    budgetMs: number;
+    // (undocumented)
+    budgetPercent: number;
+    // (undocumented)
+    durationMs: number;
+    // (undocumented)
+    entityCount: number;
+    // (undocumented)
+    heapUsedMb: number;
+    // (undocumented)
+    phases: Record<string, number>;
+    // (undocumented)
+    playerCount: number;
+    // (undocumented)
+    tick: number;
+    // (undocumented)
+    worldId: number;
+}
+
 // @public
 export interface TrimeshColliderOptions extends BaseColliderOptions {
     indices?: Uint32Array;
@@ -3331,7 +3747,10 @@ export class World extends EventRouter implements protocol.Serializable {
     get fogFar(): number;
     get fogNear(): number;
     get id(): number;
-    loadMap(map: WorldMap): void;
+    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
+        spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
+    }): void;
     get loop(): WorldLoop;
     get name(): string;
     // Warning: (ae-forgotten-export) The symbol "NetworkSynchronizer" needs to be exported by the entry point index.d.ts
@@ -3533,6 +3952,113 @@ export interface WorldMap {
     };
 }
 
+// @public (undocumented)
+export type WorldMapArtifacts = {
+    compressedMap: CompressedWorldMap;
+    compressedMapJson: string;
+    compressedMapSha256: string;
+    chunkCache: WorldMapChunkCache;
+    chunkCacheBuffer: Buffer;
+};
+
+// @public (undocumented)
+export class WorldMapArtifactsGenerator {
+    // (undocumented)
+    static create(worldMap: WorldMap, options?: {
+        compressed?: CompressWorldMapOptions;
+        chunkCache?: Omit<CreateWorldMapChunkCacheOptions, 'sourceSha256'>;
+    }): WorldMapArtifacts;
+}
+
+// @public (undocumented)
+export interface WorldMapChunkCache {
+    // (undocumented)
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    // (undocumented)
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    // (undocumented)
+    codecVersion?: number;
+    // (undocumented)
+    data: string;
+    // (undocumented)
+    entities?: WorldMap['entities'];
+    // (undocumented)
+    format?: 'hytopia.worldmap.chunk-cache';
+    // (undocumented)
+    version?: string;
+}
+
+// @public (undocumented)
+export type WorldMapChunkCacheAlgorithm = 'brotli' | 'gzip' | 'none';
+
+// @public (undocumented)
+export class WorldMapChunkCacheCodec {
+    // (undocumented)
+    static create(map: WorldMap | CompressedWorldMap, options?: CreateWorldMapChunkCacheOptions): WorldMapChunkCache;
+    // (undocumented)
+    static decode(cache: WorldMapChunkCache): {
+        metadata: WorldMapChunkCacheMetadata;
+        chunks: Iterable<ChunkCacheChunk>;
+    };
+    // (undocumented)
+    static decodeChunks(cache: WorldMapChunkCache): Iterable<ChunkCacheChunk>;
+    // (undocumented)
+    static decodeMetadata(cache: WorldMapChunkCache): WorldMapChunkCacheMetadata;
+    // (undocumented)
+    static decompressToWorldMap(cache: WorldMapChunkCache): WorldMap;
+    // (undocumented)
+    static isWorldMapChunkCache(value: unknown): value is WorldMapChunkCache;
+}
+
+// @public (undocumented)
+export interface WorldMapChunkCacheMetadata {
+    // (undocumented)
+    blockTypes?: BlockTypeOptions[];
+    // (undocumented)
+    entities?: WorldMap['entities'];
+    // (undocumented)
+    mapVersion?: unknown;
+    // (undocumented)
+    metadata?: unknown;
+    // (undocumented)
+    options?: WorldMapChunkCacheOptions;
+    // (undocumented)
+    source?: {
+        sha256?: string;
+    };
+}
+
+// @public (undocumented)
+export interface WorldMapChunkCacheOptions {
+    // (undocumented)
+    rotations?: boolean;
+}
+
+// @public (undocumented)
+export class WorldMapCodec {
+    // (undocumented)
+    static compress(map: WorldMap, options?: CompressWorldMapOptions): CompressedWorldMap;
+    // (undocumented)
+    static decodeBlockEntries(map: CompressedWorldMap): Iterable<{
+        globalCoordinate: Vector3Like;
+        blockTypeId: number;
+        blockRotation?: BlockRotation;
+    }>;
+    // (undocumented)
+    static decompressToWorldMap(map: CompressedWorldMap): WorldMap;
+    // (undocumented)
+    static isCompressedWorldMap(value: unknown): value is CompressedWorldMap;
+}
+
+// @public (undocumented)
+export class WorldMapFileLoader {
+    // (undocumented)
+    static load(mapPath: string, options?: {
+        preferChunkCache?: boolean;
+        warnings?: 'auto' | 'always' | 'never';
+    }): AnyWorldMap;
+}
+
 // @public
 export interface WorldOptions {
     ambientLightColor?: RgbColor;
@@ -3545,13 +4071,17 @@ export interface WorldOptions {
     fogNear?: number;
     gravity?: Vector3Like;
     id: number;
-    map?: WorldMap;
+    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
     name: string;
     skyboxIntensity?: number;
     skyboxUri: string;
     tag?: string;
     tickRate?: number;
 }
+
+// Warnings were encountered during analysis:
+//
+// src/worlds/maps/WorldMapChunkCacheCodec.ts:211:92 - (ae-forgotten-export) The symbol "ChunkCacheChunk" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

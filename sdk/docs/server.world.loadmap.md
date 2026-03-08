@@ -11,7 +11,10 @@ Use for: initializing or fully resetting a world from serialized map data. Do NO
 **Signature:**
 
 ```typescript
-loadMap(map: WorldMap): void;
+loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
+        spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
+    }): void;
 ```
 
 ## Parameters
@@ -39,16 +42,32 @@ map
 
 </td><td>
 
-[WorldMap](./server.worldmap.md)
+[WorldMap](./server.worldmap.md) \| [CompressedWorldMap](./server.compressedworldmap.md) \| [WorldMapChunkCache](./server.worldmapchunkcache.md) \| string
 
 
 </td><td>
 
-The map to load.
+The map to load. Can be a map object (WorldMap, CompressedWorldMap, WorldMapChunkCache) or a string file path. When a string is provided, WorldMapFileLoader auto-detects the best available format.
 
 \*\*Side effects:\*\* Clears the chunk lattice, registers block types, and spawns entities.
 
 \*\*Category:\*\* Core
+
+
+</td></tr>
+<tr><td>
+
+options
+
+
+</td><td>
+
+{ spawnEntities?: boolean; preferMapArtifacts?: boolean; }
+
+
+</td><td>
+
+_(Optional)_
 
 
 </td></tr>

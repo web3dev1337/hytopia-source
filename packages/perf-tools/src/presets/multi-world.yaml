@@ -1,0 +1,20 @@
+name: "multi-world"
+description: "4 concurrent worlds (default + 3) with boilerplate-small to gauge scaling"
+warmupMs: 5000
+phases:
+  - name: setup
+    actions:
+      - type: clear_world
+      - type: create_worlds
+        count: 3
+        mapPath: "assets/maps/boilerplate-small.json"
+  - name: measure
+    collect: true
+    duration: 60s
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 30
+  memory_mb:
+    max: 4000
+

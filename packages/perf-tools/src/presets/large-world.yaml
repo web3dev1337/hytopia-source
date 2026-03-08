@@ -1,0 +1,24 @@
+name: "large-world"
+description: "Large world with many chunks loaded - tests chunk lattice and physics broadphase"
+warmupMs: 10000
+phases:
+  - name: load-world
+    actions:
+      - type: load_map
+        mapPath: "assets/maps/boilerplate.json"
+  - name: spawn-bots
+    actions:
+      - type: spawn_bots
+        count: 20
+        behavior: random_walk
+  - name: stabilize
+    duration: 10s
+  - name: measure
+    duration: 60s
+    collect: true
+thresholds:
+  tick_duration_ms:
+    avg: 14
+    p99: 25
+  memory_mb:
+    max: 1000

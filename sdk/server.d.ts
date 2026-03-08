@@ -12,6 +12,10 @@ import type { Socket } from 'net';
 import { WebSocket as WebSocket_2 } from 'ws';
 import type { WebTransportSessionImpl } from '@fails-components/webtransport/dist/lib/types';
 
+declare type AnyConstructor = abstract new (...args: unknown[]) => unknown;
+
+export declare type AnyWorldMap = WorldMap | CompressedWorldMap | WorldMapChunkCache;
+
 /**
  * Manages the assets library and synchronization of assets
  * to the local assets directory in development.
@@ -1461,6 +1465,50 @@ export declare interface BlockTypeRegistryEventPayloads {
     };
 }
 
+export declare interface BotBehavior {
+    name: string;
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+export declare class BotManager {
+    private static _instance;
+    static get instance(): BotManager;
+    private _bots;
+    get botCount(): number;
+    spawnBot(world: World, options?: BotPlayerOptions): BotPlayer;
+    spawnBots(world: World, count: number, options?: BotPlayerOptions): BotPlayer[];
+    getBot(id: number): BotPlayer | undefined;
+    getAllBots(): BotPlayer[];
+    despawnBot(id: number): void;
+    despawnAll(): void;
+}
+
+export declare class BotPlayer {
+    readonly id: number;
+    readonly entity: Entity;
+    readonly name: string;
+    private _behavior;
+    private _world;
+    private _spawned;
+    constructor(world: World, options?: BotPlayerOptions);
+    get isSpawned(): boolean;
+    get world(): World;
+    get controller(): SimpleEntityController;
+    setBehavior(behavior: BotBehavior): void;
+    spawn(position?: Vector3Like): void;
+    teleport(position: Vector3Like): void;
+    despawn(): void;
+}
+
+export declare interface BotPlayerOptions {
+    name?: string;
+    behavior?: BotBehavior;
+    spawnPosition?: Vector3Like;
+    modelUri?: string;
+    modelScale?: number;
+    rigidBodyType?: RigidBodyType;
+}
+
 /**
  * The options for a capsule collider. @public
  *
@@ -1483,6 +1531,22 @@ export declare interface CapsuleColliderOptions extends BaseColliderOptions {
      * **Category:** Physics
      */
     radius?: number;
+}
+
+export declare class ChaseBehavior implements BotBehavior {
+    readonly name = "chase";
+    private _chaseSpeed;
+    private _detectionRadius;
+    private _updateIntervalMs;
+    private _elapsed;
+    constructor(options?: ChaseBehaviorOptions);
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+}
+
+export declare interface ChaseBehaviorOptions {
+    chaseSpeed?: number;
+    detectionRadius?: number;
+    updateIntervalMs?: number;
 }
 
 /**
@@ -1749,6 +1813,12 @@ export declare class Chunk implements protocol.Serializable {
 
 
 
+}
+
+declare interface ChunkCacheChunk {
+    originCoordinate: Vector3Like;
+    blocks: Uint8Array;
+    blockRotations: Map<number, BlockRotation>;
 }
 
 /**
@@ -2589,6 +2659,43 @@ export declare class CollisionGroupsBuilder {
  */
 export declare type CommandCallback = (player: Player, args: string[], message: string) => void;
 
+export declare interface CompressedWorldMap {
+    format?: 'hytopia.worldmap.compressed';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: CompressedWorldMapAlgorithm;
+    data: string;
+    bounds: CompressedWorldMapBounds;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+    options?: CompressedWorldMapOptions;
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare type CompressedWorldMapAlgorithm = 'brotli' | 'gzip' | 'none';
+
+declare interface CompressedWorldMapBounds {
+    minX: number;
+    minY: number;
+    minZ: number;
+    maxX: number;
+    maxY: number;
+    maxZ: number;
+}
+
+declare interface CompressedWorldMapOptions {
+    rotations?: boolean;
+    useDelta?: boolean;
+    useVarint?: boolean;
+}
+
+export declare interface CompressWorldMapOptions {
+    algorithm?: CompressedWorldMapAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+}
+
 /**
  * The options for a cone collider. @public
  *
@@ -2646,6 +2753,18 @@ export declare type ContactManifold = {
     /** The normal vector of the contact. */
     normal: Vector3Like;
 };
+
+export declare class CpuProfiler {
+    static captureProfile(durationMs: number, outputPath?: string): Promise<object | null>;
+    static captureHeapSnapshot(outputPath?: string): Promise<string>;
+}
+
+export declare interface CreateWorldMapChunkCacheOptions {
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    level?: number;
+    includeRotations?: boolean;
+    sourceSha256?: string;
+}
 
 /**
  * The options for a cylinder collider. @public
@@ -3502,6 +3621,52 @@ export declare class Entity extends RigidBody implements protocol.Serializable {
      * **Category:** Entities
      */
     getModelAnimation(name: string): EntityModelAnimation | undefined;
+    /**
+     * Sets the playback rate for all of the entity's model animations.
+     *
+     * @remarks
+     * A value of 1 is normal speed, 0.5 is half speed, 2 is double speed.
+     * A negative value will play the animation in reverse.
+     *
+     * @param playbackRate - The playback rate of the entity's model animations.
+     *
+     * **Category:** Entities
+     */
+    setModelAnimationsPlaybackRate(playbackRate: number): void;
+    /**
+     * Starts looped animations by name on this entity's model.
+     *
+     * @param names - Animation names to start looping.
+     *
+     * **Category:** Entities
+     */
+    startModelLoopedAnimations(names: readonly string[]): void;
+    /**
+     * Starts one-shot animations by name on this entity's model.
+     *
+     * @param names - Animation names to play once.
+     *
+     * **Category:** Entities
+     */
+    startModelOneshotAnimations(names: readonly string[]): void;
+    /**
+     * Sets the emissive color for a model node by name.
+     *
+     * @param nodeName - The node name to target.
+     * @param color - The RGB color to set, or undefined to clear.
+     *
+     * **Category:** Entities
+     */
+    setModelNodeEmissiveColor(nodeName: string, color: RgbColor | undefined): void;
+    /**
+     * Sets the emissive intensity for a model node by name.
+     *
+     * @param nodeName - The node name to target.
+     * @param intensity - The intensity value to set, or undefined to clear.
+     *
+     * **Category:** Entities
+     */
+    setModelNodeEmissiveIntensity(nodeName: string, intensity: number | undefined): void;
     /**
      * Gets or lazily creates a model node override for the entity's model.
      *
@@ -5115,6 +5280,32 @@ export declare interface GameServerEventPayloads {
     };
 }
 
+export declare class IdleBehavior implements BotBehavior {
+    readonly name = "idle";
+    tick(_bot: BotPlayer, _world: World, _deltaTimeMs: number): void;
+}
+
+export declare class InteractBehavior implements BotBehavior {
+    readonly name = "interact";
+    private _interactRadius;
+    private _actionIntervalMs;
+    private _moveSpeed;
+    private _elapsed;
+    private _moveElapsed;
+    private _originX;
+    private _originZ;
+    private _originSet;
+    constructor(options?: InteractBehaviorOptions);
+    tick(bot: BotPlayer, world: World, deltaTimeMs: number): void;
+    private _moveToRandom;
+}
+
+export declare interface InteractBehaviorOptions {
+    interactRadius?: number;
+    actionIntervalMs?: number;
+    moveSpeed?: number;
+}
+
 /**
  * An intersection result.
  *
@@ -6121,6 +6312,14 @@ export declare type ModelTrimesh = {
     indices: Uint32Array;
 };
 
+export declare function Monitor(operationName?: string): MethodDecorator;
+
+export declare function monitorAsyncBlock<T>(name: string, fn: () => Promise<T>): Promise<T>;
+
+export declare function monitorBlock<T>(name: string, fn: () => T): T;
+
+export declare function MonitorClass(prefix?: string): <TConstructor extends AnyConstructor>(constructor: TConstructor) => TConstructor;
+
 /**
  * Callback invoked as the entity moves toward a target coordinate.
  *
@@ -6170,6 +6369,50 @@ export declare type MoveOptions = {
     moveCompletesWhenStuck?: boolean;
 };
 
+export declare class NetworkMetrics {
+    private static _instance;
+    static get instance(): NetworkMetrics;
+    private _enabled;
+    private _bytesSentTotal;
+    private _bytesReceivedTotal;
+    private _packetsSentTotal;
+    private _packetsReceivedTotal;
+    private _compressionCount;
+    private _serializationTotalMs;
+    private _serializationCount;
+    private _lastSnapshotTime;
+    private _lastBytesSent;
+    private _lastBytesReceived;
+    private _lastPacketsSent;
+    private _lastPacketsReceived;
+    private _connectedPlayers;
+    get isEnabled(): boolean;
+    enable(): void;
+    disable(): void;
+    reset(): void;
+    setConnectedPlayers(count: number): void;
+    recordBytesSent(bytes: number): void;
+    recordBytesReceived(bytes: number): void;
+    recordPacketSent(): void;
+    recordPacketReceived(): void;
+    recordSerialization(durationMs: number): void;
+    recordCompression(): void;
+    getSnapshot(): NetworkMetricsSnapshot;
+    private _reset;
+}
+
+export declare interface NetworkMetricsSnapshot {
+    connectedPlayers: number;
+    bytesSentTotal: number;
+    bytesReceivedTotal: number;
+    bytesSentPerSecond: number;
+    bytesReceivedPerSecond: number;
+    packetsSentPerSecond: number;
+    packetsReceivedPerSecond: number;
+    avgSerializationMs: number;
+    compressionCount: number;
+}
+
 /**
  * The options for an error type "none" collider. @public
  *
@@ -6180,6 +6423,18 @@ export declare type MoveOptions = {
  */
 export declare interface NoneColliderOptions extends BaseColliderOptions {
     shape: ColliderShape.NONE;
+}
+
+export declare interface OperationStats {
+    count: number;
+    totalMs: number;
+    avgMs: number;
+    minMs: number;
+    maxMs: number;
+    lastMs: number;
+    p50Ms: number;
+    p95Ms: number;
+    p99Ms: number;
 }
 
 /**
@@ -7183,6 +7438,85 @@ export declare type PathfindingOptions = {
     /** The timeout in milliseconds for a waypoint to be considered reached. Defaults to 2000ms divided by the speed of the entity. */
     waypointTimeoutMs?: number;
 };
+
+export declare class PerformanceMonitor extends EventRouter {
+    private static _instance;
+    static get instance(): PerformanceMonitor;
+    private _enabled;
+    private _entityProfilingEnabled;
+    private _spikeThresholdMs;
+    private _tickBudgetMs;
+    private _snapshotIntervalMs;
+    private _historySize;
+    private _startTime;
+    private _operations;
+    private _worldTicks;
+    private _entityCosts;
+    private _snapshotTimer;
+    private constructor();
+    get isEnabled(): boolean;
+    get isEntityProfilingEnabled(): boolean;
+    enable(options?: PerformanceMonitorOptions): void;
+    disable(): void;
+    enableEntityProfiling(enabled: boolean): void;
+    measure<T>(name: string, fn: () => T): T;
+    measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T>;
+    startTiming(name: string): () => void;
+    beginTick(tick: number, entityCount: number, playerCount: number, worldId?: number): void;
+    recordPhase(phaseName: string, durationMs: number, worldId?: number): void;
+    endTick(worldId?: number): void;
+    recordEntityCost(entityId: number, name: string, tickMs: number): void;
+    getEntityCosts(): Map<number, {
+        tickMs: number;
+        name: string;
+    }>;
+    getSnapshot(worldId?: number): PerformanceSnapshot;
+    resetStats(): void;
+    private _recordOperation;
+    private _getOrCreateWorldTickState;
+    private _getTickSamples;
+    private _getAllTickSamples;
+    private _getRollup;
+    private _getGlobalRollup;
+    private _getOperationStats;
+}
+
+export declare enum PerformanceMonitorEvent {
+    TICK_REPORT = "PERFORMANCE_MONITOR.TICK_REPORT",
+    SPIKE_DETECTED = "PERFORMANCE_MONITOR.SPIKE_DETECTED",
+    SNAPSHOT = "PERFORMANCE_MONITOR.SNAPSHOT"
+}
+
+export declare interface PerformanceMonitorEventPayloads {
+    [PerformanceMonitorEvent.TICK_REPORT]: TickReport;
+    [PerformanceMonitorEvent.SPIKE_DETECTED]: TickReport;
+    [PerformanceMonitorEvent.SNAPSHOT]: PerformanceSnapshot;
+}
+
+export declare interface PerformanceMonitorOptions {
+    spikeThresholdMs?: number;
+    tickBudgetMs?: number;
+    snapshotIntervalMs?: number;
+    historySize?: number;
+}
+
+export declare interface PerformanceSnapshot {
+    uptimeMs: number;
+    tickRate: number;
+    avgTickMs: number;
+    maxTickMs: number;
+    p95TickMs: number;
+    p99TickMs: number;
+    ticksOverBudget: number;
+    totalTicks: number;
+    budgetMs: number;
+    operations: Record<string, OperationStats>;
+    memory: {
+        heapUsedMb: number;
+        heapTotalMb: number;
+        rssMb: number;
+    };
+}
 
 /**
  * Manages persistence of player and global data.
@@ -8823,6 +9157,26 @@ export declare interface QuaternionLike {
     y: number;
     z: number;
     w: number;
+}
+
+export declare class RandomWalkBehavior implements BotBehavior {
+    readonly name = "random_walk";
+    private _moveRadius;
+    private _moveSpeed;
+    private _changeIntervalMs;
+    private _elapsed;
+    private _originX;
+    private _originZ;
+    private _originSet;
+    constructor(options?: RandomWalkOptions);
+    tick(bot: BotPlayer, _world: World, deltaTimeMs: number): void;
+    private _pickNewTarget;
+}
+
+export declare interface RandomWalkOptions {
+    moveRadius?: number;
+    moveSpeed?: number;
+    changeDirectionIntervalMs?: number;
 }
 
 /**
@@ -10492,6 +10846,18 @@ export declare type TelemetrySpanOptions = {
     attributes?: Record<string, string | number>;
 };
 
+export declare interface TickReport {
+    worldId: number;
+    tick: number;
+    durationMs: number;
+    budgetMs: number;
+    budgetPercent: number;
+    phases: Record<string, number>;
+    entityCount: number;
+    playerCount: number;
+    heapUsedMb: number;
+}
+
 /**
  * The options for a trimesh collider. @public
  *
@@ -11343,13 +11709,18 @@ export declare class World extends EventRouter implements protocol.Serializable 
      * - Registers block types from the map into `World.blockTypeRegistry`.
      * - Spawns map entities as `isEnvironmental: true` by default.
      *
-     * @param map - The map to load.
+     * @param map - The map to load. Can be a map object (WorldMap, CompressedWorldMap,
+     *   WorldMapChunkCache) or a string file path. When a string is provided,
+     *   WorldMapFileLoader auto-detects the best available format.
      *
      * **Side effects:** Clears the chunk lattice, registers block types, and spawns entities.
      *
      * **Category:** Core
      */
-    loadMap(map: WorldMap): void;
+    loadMap(map: WorldMap | CompressedWorldMap | WorldMapChunkCache | string, options?: {
+        spawnEntities?: boolean;
+        preferMapArtifacts?: boolean;
+    }): void;
     /**
      * Sets the color of the world's ambient light.
      *
@@ -11852,6 +12223,83 @@ export declare interface WorldMap {
     };
 }
 
+export declare type WorldMapArtifacts = {
+    compressedMap: CompressedWorldMap;
+    compressedMapJson: string;
+    compressedMapSha256: string;
+    chunkCache: WorldMapChunkCache;
+    chunkCacheBuffer: Buffer;
+};
+
+export declare class WorldMapArtifactsGenerator {
+    static create(worldMap: WorldMap, options?: {
+        compressed?: CompressWorldMapOptions;
+        chunkCache?: Omit<CreateWorldMapChunkCacheOptions, 'sourceSha256'>;
+    }): WorldMapArtifacts;
+}
+
+export declare interface WorldMapChunkCache {
+    format?: 'hytopia.worldmap.chunk-cache';
+    codecVersion?: number;
+    version?: string;
+    algorithm?: WorldMapChunkCacheAlgorithm;
+    data: string;
+    blockTypes?: BlockTypeOptions[] | Record<string, BlockTypeOptions>;
+    entities?: WorldMap['entities'];
+}
+
+export declare type WorldMapChunkCacheAlgorithm = 'brotli' | 'gzip' | 'none';
+
+export declare class WorldMapChunkCacheCodec {
+    private static _writeHeader;
+    static isWorldMapChunkCache(value: unknown): value is WorldMapChunkCache;
+    static create(map: WorldMap | CompressedWorldMap, options?: CreateWorldMapChunkCacheOptions): WorldMapChunkCache;
+    static decode(cache: WorldMapChunkCache): {
+        metadata: WorldMapChunkCacheMetadata;
+        chunks: Iterable<ChunkCacheChunk>;
+    };
+    static decodeMetadata(cache: WorldMapChunkCache): WorldMapChunkCacheMetadata;
+    static decodeChunks(cache: WorldMapChunkCache): Iterable<ChunkCacheChunk>;
+    static decompressToWorldMap(cache: WorldMapChunkCache): WorldMap;
+    private static _decodeFile;
+    private static _decodeMetadata;
+    private static _decodeChunks;
+    private static _encodeBody;
+}
+
+export declare interface WorldMapChunkCacheMetadata {
+    blockTypes?: BlockTypeOptions[];
+    entities?: WorldMap['entities'];
+    options?: WorldMapChunkCacheOptions;
+    source?: {
+        sha256?: string;
+    };
+    metadata?: unknown;
+    mapVersion?: unknown;
+}
+
+export declare interface WorldMapChunkCacheOptions {
+    rotations?: boolean;
+}
+
+export declare class WorldMapCodec {
+    static isCompressedWorldMap(value: unknown): value is CompressedWorldMap;
+    static compress(map: WorldMap, options?: CompressWorldMapOptions): CompressedWorldMap;
+    static decodeBlockEntries(map: CompressedWorldMap): Iterable<{
+        globalCoordinate: Vector3Like;
+        blockTypeId: number;
+        blockRotation?: BlockRotation;
+    }>;
+    static decompressToWorldMap(map: CompressedWorldMap): WorldMap;
+}
+
+export declare class WorldMapFileLoader {
+    static load(mapPath: string, options?: {
+        preferChunkCache?: boolean;
+        warnings?: 'auto' | 'always' | 'never';
+    }): AnyWorldMap;
+}
+
 /**
  * Options for creating a World instance.
  *
@@ -11885,7 +12333,7 @@ export declare interface WorldOptions {
     /** The minimum distance from the camera to start applying fog. */
     fogNear?: number;
     /** The map of the world. */
-    map?: WorldMap;
+    map?: WorldMap | CompressedWorldMap | WorldMapChunkCache | string;
     /** The name of the world. */
     name: string;
     /** The intensity of the skybox brightness for the world. 0 is black, 1 is full brightness, 1+ is brighter. */

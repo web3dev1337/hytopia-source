@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-03-05T13:32:02.575Z",
+  "scenario": "entity-density",
+  "durationMs": 73977,
+  "baseline": {
+    "avgTickMs": 0.3924285878918189,
+    "maxTickMs": 1.970153999995091,
+    "p95TickMs": 0.5939613166672036,
+    "p99TickMs": 0.7920050833331819,
+    "ticksOverBudgetPct": 0,
+    "avgMemoryMb": 43.67034441630046,
+    "operations": {
+      "entities_tick": {
+        "avgMs": 0.020244843751854383,
+        "p95Ms": 0.03560461666662983
+      },
+      "physics_step": {
+        "avgMs": 0.1488405374272718,
+        "p95Ms": 0.21693571666686087
+      },
+      "physics_cleanup": {
+        "avgMs": 0.002849293828988602,
+        "p95Ms": 0.003773400000560893
+      },
+      "simulation_step": {
+        "avgMs": 0.15477759287683973,
+        "p95Ms": 0.22579720000024583
+      },
+      "entities_emit_updates": {
+        "avgMs": 0.19779759032391983,
+        "p95Ms": 0.3156859999987925
+      },
+      "world_tick": {
+        "avgMs": 0.3903471358062624,
+        "p95Ms": 0.5898788333338719
+      },
+      "ticker_tick": {
+        "avgMs": 0.4233709562050146,
+        "p95Ms": 0.6320953999998286
+      },
+      "send_all_packets": {
+        "avgMs": 0.0029213276313554246,
+        "p95Ms": 0.0035241833331080366
+      },
+      "network_synchronize_cleanup": {
+        "avgMs": 0.004256742413836006,
+        "p95Ms": 0.005522016666509444
+      },
+      "network_synchronize": {
+        "avgMs": 0.020431206791100387,
+        "p95Ms": 0.03007198333358853
+      }
+    },
+    "network": {
+      "totalBytesSent": 0,
+      "totalBytesReceived": 0,
+      "maxConnectedPlayers": 0,
+      "avgBytesSentPerSecond": 0,
+      "maxBytesSentPerSecond": 0,
+      "avgBytesReceivedPerSecond": 0,
+      "maxBytesReceivedPerSecond": 0,
+      "avgPacketsSentPerSecond": 0,
+      "maxPacketsSentPerSecond": 0,
+      "avgPacketsReceivedPerSecond": 0,
+      "maxPacketsReceivedPerSecond": 0,
+      "avgSerializationMs": 0,
+      "compressionCountTotal": 0
+    }
+  },
+  "phases": [
+    {
+      "name": "setup",
+      "durationMs": 53,
+      "collected": false
+    },
+    {
+      "name": "stabilize",
+      "durationMs": 8835,
+      "collected": false
+    },
+    {
+      "name": "measure",
+      "durationMs": 59042,
+      "collected": true
+    }
+  ],
+  "metrics": {
+    "tickReportCount": 0,
+    "spikeCount": 0,
+    "serverSnapshotCount": 60,
+    "clientSnapshotCount": 0
+  }
+}

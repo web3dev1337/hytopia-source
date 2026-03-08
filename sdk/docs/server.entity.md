@@ -1008,6 +1008,48 @@ Sets the emissive intensity of the entity.
 </td></tr>
 <tr><td>
 
+[setModelAnimationsPlaybackRate(playbackRate)](./server.entity.setmodelanimationsplaybackrate.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the playback rate for all of the entity's model animations.
+
+
+</td></tr>
+<tr><td>
+
+[setModelNodeEmissiveColor(nodeName, color)](./server.entity.setmodelnodeemissivecolor.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the emissive color for a model node by name.
+
+
+</td></tr>
+<tr><td>
+
+[setModelNodeEmissiveIntensity(nodeName, intensity)](./server.entity.setmodelnodeemissiveintensity.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Sets the emissive intensity for a model node by name.
+
+
+</td></tr>
+<tr><td>
+
 [setModelScale(modelScale)](./server.entity.setmodelscale.md)
 
 
@@ -1145,6 +1187,34 @@ Sets the tint color of the entity.
 Spawns the entity in the world.
 
 Use for: placing the entity into a world so it simulates and syncs to clients. Do NOT use for: reusing a single entity instance across multiple worlds.
+
+
+</td></tr>
+<tr><td>
+
+[startModelLoopedAnimations(names)](./server.entity.startmodelloopedanimations.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Starts looped animations by name on this entity's model.
+
+
+</td></tr>
+<tr><td>
+
+[startModelOneshotAnimations(names)](./server.entity.startmodeloneshotanimations.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Starts one-shot animations by name on this entity's model.
 
 
 </td></tr>
