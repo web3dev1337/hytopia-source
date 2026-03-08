@@ -1,179 +1,30 @@
-# Hytopia Coding Standards & AI PR Review Guidelines
+# Hytopia Coding Standards
 
-Compiled from a 6-agent analysis of ~49k lines of TypeScript across `server/src/`, `client/src/`, and `protocol/`.
+Extracted from ~49k lines of TypeScript across `server/src/`, `client/src/`, and `protocol/`.
+
+For contribution process, PR requirements, and review workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## Quick Reference: Hard Rules
+## Hard Rules
 
-These are non-negotiable. Any PR violating these should be rejected.
+Non-negotiable. Any PR violating these should be rejected.
 
 | # | Rule | Rationale |
 |---|------|-----------|
-| 1 | No file over 800 lines | Prevents God Classes (NetworkSynchronizer: 1561, client Entity: 2900) |
-| 2 | No method over 40 lines | `tickWithPlayerInput` at 225 lines is a cautionary tale |
-| 3 | No `any` in exported types | Use `unknown` or proper types; `any` breaks the type system |
-| 4 | No monkey-patching | Fragile, unchainable, no cleanup path |
-| 5 | No `console.log` in production code | Use `ErrorHandler` or `console.info` |
-| 6 | No TODO for error handling | Handle errors before merging |
-| 7 | Pair every event listener with cleanup | Store references; remove in `detach()`/`dispose()` |
-| 8 | No inline value equality checks | Create and use utility functions |
-| 9 | Use `async/await` over `.then()` chains | Clearer error handling, better stack traces |
-| 10 | Configuration arrays must be `readonly` | Prevents external mutation of internal state |
-| 11 | 3+ identical patterns → mapping table or helper | Prevents boilerplate sprawl |
-| 12 | No magic numbers | Extract to named constants or config |
-| 13 | Data-driven over hardcoded | Game values belong in config, not source code |
-| 14 | Defaults are sacred — change with extreme care | A default change silently affects every existing game |
-| 15 | Backwards compatibility required | Existing games must not break on SDK upgrade |
-| 16 | Prefer config/data files over code constants | Convention-over-configuration; separate data from logic |
-
----
-
-## 0. Contribution & Review Process
-
-These rules apply to all contributions — human or AI.
-
-### 0.1 PR Requirements
-
-Every PR must include:
-- **Problem/benefit statement**: What problem does this solve or what value does it add?
-- **Testing done**: What manual and automated testing was performed? On which platforms (desktop, mobile, iOS, Android)?
-- **AI tools used**: Which AI models/harnesses were used for development and review?
-- **Backwards compatibility assessment**: Does this change have any chance of breaking existing games? If someone upgrades to this SDK version, do they need to change code or assets on their end?
-- **Opt-in vs automatic**: If the change is 100% an upgrade in all situations, it should apply automatically with no code changes. If it has tradeoffs (e.g., performance cost for visual improvement), it should be opt-in.
-
-### 0.2 Review Layers
-
-PRs must pass through multiple review layers before merge:
-
-1. **Static type checks** — `npm run typecheck` must pass locally and in CI (GitHub Actions)
-2. **Linting** — `npm run lint` must pass
-3. **Unit tests** — pragmatic, high signal-to-noise tests that catch regressions
-4. **Performance tests** — run locally at minimum; CI integration where viable
-5. **AI code review** — at least 1 additional AI review with a **fresh context** (even if same model). Preferably 2 different tools (e.g., Claude Code + Codex). Codex can be hooked to GitHub for automatic review.
-6. **Human code review** — a human with code knowledge reviewing for: wrong architecture, code smells, bad practices, suspicious hardcoding. Not checking syntax — checking design.
-7. **Manual testing** — the PR submitter must have manually tested. Standard guides/tools for testing modified SDK code in a game must be provided. Test on multiple platforms.
-8. **Game regression testing** — where possible, run PRs against existing games (e.g., Hatch A Zoo, VoxFire) to verify no breakage. PR creators should provide evidence of testing against published games.
-
-### 0.3 Backwards Compatibility
-
-This is critical. A change that "works" but breaks existing games is worse than no change.
-
-```
-Questions every PR must answer:
-1. Does this change any default value?
-   → If yes, what existing behavior changes silently?
-2. Does this change any public API signature?
-   → If yes, what existing code breaks on upgrade?
-3. Does this change any wire protocol?
-   → If yes, what client/server version combinations break?
-4. Is this opt-in or automatic?
-   → Automatic changes must be universally beneficial with zero downsides
-   → Changes with tradeoffs must be opt-in
-```
-
-**Real examples of backwards compatibility failures:**
-- Changing default particle alpha → broke smoke grenade visuals in existing games
-- Changing player controller defaults → existing games behaved differently on upgrade
-- Changing character model conventions → existing games needed asset updates
-
-**Rule**: Default values are part of the API contract. Changing a default is a breaking change, even if the parameter is "optional."
-
-### 0.4 Best Solution / Robustness Check
-
-A PR might solve a real problem but:
-- Is it the **best** approach, or just the first approach that worked?
-- Does it account for **different game scenarios**? (e.g., a feature that works for 10 entities but kills performance with 1000)
-- Should it be **opt-in** with per-entity/per-world granularity?
-- Does it **scale** to large games?
-
-Reviewers should ask: "Would this work in Hatch A Zoo with hundreds of entities?"
-
-### 0.5 Quality Gate Stack
-
-| Layer | Tool/Method | When |
-|-------|------------|------|
-| Type safety | `npm run typecheck` | Every commit, CI |
-| Lint | `npm run lint` | Every commit, CI |
-| Unit tests | `npm run test` | Every commit, CI |
-| Perf tests | `npm run test:perf` (local) | Before PR, ideally CI |
-| AI review | Fresh-context AI review (1-2 tools) | Before PR |
-| Human review | Architecture/design review | Before merge |
-| Manual test | Desktop + mobile platforms | Before PR |
-| Game regression | Run against existing games | Before merge (where possible) |
-
----
-
-## 0b. Data-Driven Design Principles
-
-### No Magic Numbers
-
-Every numeric literal in game logic must be a named constant or config value.
-
-```typescript
-// DO: Named constant
-const RECONNECT_WINDOW_MS = 30 * 1000;
-const MAX_ACTIVE_AUDIO_NODES = 64;
-private static readonly WALK_FORCE_THRESHOLD = 0.1;
-
-// DON'T: Magic numbers in logic
-if (distance < 16) { ... }           // what is 16?
-setTimeout(callback, 5000);           // why 5000?
-if (count > 64) { ... }              // where does 64 come from?
-```
-
-### Data-Driven Over Hardcoded
-
-Tunable values (tick rates, thresholds, timeouts, capacities) should be configurable rather than buried in source code.
-
-```typescript
-// DO: Configurable via options
-constructor(options: WorldOptions) {
-  this._tickRate = options.tickRate ?? 60;
-  this._gravity = options.gravity ?? { x: 0, y: -32, z: 0 };
-}
-
-// DON'T: Bury tunable values in logic
-this._tickRate = 60;               // not configurable
-this._gravity = { x: 0, y: -32, z: 0 }; // not overridable
-```
-
-### Convention Over Configuration
-
-Establish conventions that eliminate boilerplate configuration:
-- File naming conventions that auto-register content
-- Default values that cover 90% of use cases
-- Predictable patterns that don't require explicit wiring
-
-### Separate UI, Logic, and Data
-
-Three concerns, three layers. Never mix them:
-- **Data**: Config files, schemas, generated catalogs
-- **Logic**: Runtime systems, state management, game rules
-- **UI**: Presentation, HUD, modals, scene UI
-
-### Defaults Are Sacred
-
-Changing a default value is a **breaking change** in disguise. It silently alters behavior for every existing consumer.
-
-```typescript
-// DANGEROUS: Changing this default
-export interface ParticleEmitterOptions {
-  opacity?: number;  // was 1.0, someone changes to 0.8
-  // → Every game's particles suddenly become semi-transparent
-}
-
-// SAFE: Add new option with backwards-compatible default
-export interface ParticleEmitterOptions {
-  opacity?: number;       // stays 1.0
-  fadeOnDeath?: boolean;  // NEW, defaults to false (opt-in)
-}
-```
-
-Before changing any default:
-1. List every place the default is consumed
-2. Assess impact on existing games
-3. If any game would behave differently → it's a breaking change → requires migration path or opt-in
+| 1 | No file over 800 lines | Prevents God Classes |
+| 2 | No method over 40 lines | Decompose into focused helpers |
+| 3 | No `any` in exported types | Use `unknown` or proper types |
+| 4 | No magic numbers | Extract to named constants or options |
+| 5 | No monkey-patching | Fragile, unchainable, no cleanup path |
+| 6 | No `console.log` in production code | Use `ErrorHandler` or `console.info` |
+| 7 | No TODO for error handling | Handle errors before merging |
+| 8 | Pair every event listener with cleanup | Store references; remove in `detach()`/`dispose()` |
+| 9 | No inline value equality checks | Create and use utility functions |
+| 10 | 3+ identical patterns → mapping table or helper | Prevents boilerplate sprawl |
+| 11 | Configuration arrays must be `readonly` | Prevents external mutation |
+| 12 | Use `async/await` over `.then()` chains | Clearer error handling, better stack traces |
+| 13 | Tunable values must be configurable via options | Not buried in source code |
 
 ---
 
@@ -181,7 +32,7 @@ Before changing any default:
 
 ### 1.1 Classes
 
-**PascalCase** with role-specific suffixes. The suffix communicates architectural role.
+**PascalCase** with role-specific suffixes.
 
 ```typescript
 // DO: Role suffix from this approved list
@@ -201,7 +52,7 @@ class MathUtil { }        // "Util" is meaningless
 
 ### 1.2 Methods
 
-**camelCase** with verb prefix. The verb communicates the operation type.
+**camelCase** with verb prefix.
 
 | Verb | Usage | Example |
 |------|-------|---------|
@@ -227,9 +78,9 @@ public ambientLightColorSet(): void { }  // wrong verb position
 public spawned(): boolean { }            // missing verb prefix
 ```
 
-### 1.3 Fields & Methods: Private Visibility
+### 1.3 Private Fields & Methods
 
-**All private fields and methods use `_` prefix.** This is universal across both server and client.
+**All private fields and methods use `_` prefix.**
 
 ```typescript
 // DO
@@ -259,22 +110,16 @@ export const ENTITY_POSITION_UPDATE_THRESHOLD_SQ = 0.04 * 0.04;
 **PascalCase** name, **UPPER_SNAKE_CASE** members.
 
 ```typescript
-// DO
 export enum PlayerEvent {
   CHAT_MESSAGE_SEND = 'PLAYER.CHAT_MESSAGE_SEND',
   JOINED_WORLD      = 'PLAYER.JOINED_WORLD',
   LEFT_WORLD         = 'PLAYER.LEFT_WORLD',
 }
-
-// DON'T: PascalCase members
-export enum PlayerEvent {
-  ChatMessageSend = 'PLAYER.CHAT_MESSAGE_SEND',  // wrong
-}
 ```
 
 ### 1.6 Event String Format
 
-`'NAMESPACE.EVENT_NAME'` using dot separator. Namespace matches the class name in UPPER_SNAKE_CASE.
+`'NAMESPACE.EVENT_NAME'` using dot separator:
 
 ```typescript
 'GAMESERVER.START'
@@ -286,7 +131,7 @@ export enum PlayerEvent {
 
 ### 1.7 Event Payload Interfaces
 
-Each event-emitting class exports a paired `{ClassName}EventPayloads` interface with computed property keys:
+Each event-emitting class exports a paired `{ClassName}EventPayloads` interface:
 
 ```typescript
 export interface PlayerEventPayloads {
@@ -340,7 +185,7 @@ export default class GameServer { ... }
 
 ### 2.3 Type-Only Imports
 
-Always use `import type` for type-only imports. This is enforced codebase-wide.
+Always use `import type` for type-only imports.
 
 ```typescript
 // DO
@@ -377,8 +222,6 @@ import { JSONSchemaType } from 'ajv';  // value import for a type
 ```
 
 ### 3.2 One-Liner Getters
-
-Simple property access getters go on a single line:
 
 ```typescript
 // DO
@@ -445,7 +288,6 @@ private _world: World | null;
 Public methods must have explicit return type annotations. Private methods may omit them when obvious.
 
 ```typescript
-// DO
 public getConnectedPlayers(): Player[] { ... }
 public get playerCount(): number { ... }
 public async scheduleNotification(type: string): Promise<string | void> { ... }
@@ -462,8 +304,6 @@ export const SUPPORTED_INPUTS = [
 ```
 
 ### 4.4 Type Predicates Over `!` Assertions
-
-Use type predicates or assertion functions instead of non-null assertions after guards.
 
 ```typescript
 // DO: assertion function
@@ -528,8 +368,6 @@ Use `fatalError` only for impossible invariant violations. Not for:
 
 ### 5.4 Early Return Pattern
 
-Prefer early returns to reduce nesting:
-
 ```typescript
 // DO
 public joinWorld(world: World) {
@@ -548,19 +386,7 @@ public joinWorld(world: World) {
 }
 ```
 
-### 5.5 Try/Catch
-
-Use sparingly, mainly around I/O, event emission, and transport operations:
-
-```typescript
-try {
-  this._emitter.emit(eventType, payload);
-} catch (error) {
-  console.error(`EventRouter.emit(): Error emitting event "${eventType}":`, error);
-}
-```
-
-### 5.6 No Empty Catch Blocks
+### 5.5 No Empty Catch Blocks
 
 ```typescript
 // DON'T
@@ -578,7 +404,7 @@ try {
 
 ### 6.1 Singleton Pattern
 
-Two approved variants:
+Two approved variants. Note: the codebase is singleton-heavy (DIP score: 4/10). New code should prefer constructor injection where practical. If you must use a singleton, define an interface for the dependency.
 
 **Lazy (when initialization order matters):**
 ```typescript
@@ -611,10 +437,6 @@ export interface XxxEventPayloads {
 
 export default class Xxx extends EventRouter<XxxEventPayloads> {
   // ...
-  public doSomething() {
-    // ...
-    this.emitWithWorld(this._world!, XxxEvent.SOMETHING_HAPPENED, { xxx: this, detail: '...' });
-  }
 }
 ```
 
@@ -658,8 +480,6 @@ constructor(options: WorldOptions) {
 ```
 
 ### 6.5 Composition Over Inheritance
-
-`World` is the prime example — composes 10+ sub-systems rather than inheriting from them:
 
 ```typescript
 // DO: Composition
@@ -739,11 +559,9 @@ export const entitySchema: JSONSchemaType<EntitySchema> = {
 
 ## 8. Performance Patterns
 
-These patterns are established in the codebase. New code in hot paths must follow them.
+New code in hot paths must follow these established patterns.
 
 ### 8.1 Pre-allocated Working Variables
-
-Module-level reusable objects to avoid GC pressure:
 
 ```typescript
 // DO: module-level working variables
@@ -766,8 +584,6 @@ class Entity {
 
 ### 8.2 Manual Matrix Management
 
-`matrixAutoUpdate = false` everywhere. Update matrices explicitly:
-
 ```typescript
 object.matrixAutoUpdate = false;
 object.matrixWorldAutoUpdate = false;
@@ -778,8 +594,6 @@ object.updateMatrixWorld();
 
 ### 8.3 Packed Numeric Keys for Map Lookups
 
-Use numeric/packed keys in hot-path maps, not string concatenation:
-
 ```typescript
 // DO
 const key = (x << 20) | (y << 10) | z;  // packed numeric key
@@ -789,8 +603,6 @@ const key = `${x},${y},${z}`;  // string allocation every lookup
 ```
 
 ### 8.4 Update Thresholds
-
-Only emit updates when changes exceed thresholds:
 
 ```typescript
 const POSITION_THRESHOLD_SQ = 0.04 * 0.04;
@@ -824,145 +636,99 @@ New code must follow the conventions of the layer it's in.
 
 ## 10. Known Improvement Areas
 
-These are documented weaknesses in the current codebase. New code should not make them worse. Improvements are welcome.
+Documented weaknesses. New code should not make them worse. Improvements are welcome.
 
-### 10.1 Dependency Inversion (Score: 4/10)
+| Area | Score | Issue | Guidance for new code |
+|------|:-----:|-------|----------------------|
+| Dependency Inversion | 4/10 | 15+ concrete singletons, no DI | Prefer constructor injection; define interfaces |
+| Coupling | 5/10 | Fully connected singleton graph | Don't add new singleton dependencies |
+| Law of Demeter | 5/10 | Deep chains through managers | Add convenience methods instead of reaching through |
+| SRP | 6/10 | Entity, NetworkSynchronizer overloaded | Don't add responsibilities to God Classes |
+| DRY | 6/10 | 60+ identical handlers, 70+ identical setters | Use mapping tables for 3+ identical patterns |
 
-The codebase relies heavily on concrete singletons (`GameServer.instance`, `PlayerManager.instance`, etc.) instead of interfaces and injection. This limits testability.
+**God Classes — do not add to these files:**
 
-**For new code**: Prefer constructor injection where practical. If you must use a singleton, at minimum define an interface for the dependency.
-
-### 10.2 Law of Demeter (Score: 5/10)
-
-Deep property chains are common:
-```typescript
-// This pattern exists but should not be extended
-this._world.entityManager.getPlayerEntitiesByPlayer(this)[0];
-this._game.settingsManager.qualityPerfTradeoff.viewDistance.enabled;
-```
-
-**For new code**: Add convenience methods on the owning class rather than reaching through multiple levels.
-
-### 10.3 God Classes
-
-| Class | Lines | Status |
-|-------|-------|--------|
-| Client `Entity.ts` | ~2900 | Should extract AnimationManager, MaterialManager, CullingManager |
-| `NetworkSynchronizer` | ~1561 | Should extract per-domain sync handlers |
-| `GLTFManager` | ~1812 | Should split loading, caching, instancing |
+| Class | Lines | Should extract |
+|-------|-------|----------------|
+| Client `Entity.ts` | ~2900 | AnimationManager, MaterialManager, CullingManager |
+| `NetworkSynchronizer` | ~1561 | Per-domain sync handlers |
+| `GLTFManager` | ~1812 | Loading, caching, instancing |
 | `RigidBody` / `Collider` | ~1750 each | Acceptable as physics wrappers |
-
-**For new code**: Do not add more responsibilities to these files. Extract into new focused classes.
-
-### 10.4 DRY Violations
-
-- 60+ identical event handler methods in `NetworkSynchronizer` (use data-driven mapping)
-- 70+ identical setter+emit patterns across Entity, PlayerCamera, ParticleEmitter
-- Inline RGB color equality checks duplicated
-
-**For new code**: If you see 3+ methods following the same pattern, use a mapping table or generic helper.
 
 ---
 
-## 11. AI PR Review Checklist
-
-Use this checklist when reviewing AI-generated pull requests.
+## 11. Code Review Checklist
 
 ### Naming & Style
-- [ ] Classes use PascalCase + approved role suffix
-- [ ] Methods use camelCase + verb prefix
-- [ ] Private fields/methods use `_` prefix
-- [ ] Constants use SCREAMING_SNAKE_CASE
-- [ ] Enum members use UPPER_SNAKE_CASE
-- [ ] Event strings follow `'NAMESPACE.EVENT_NAME'` format
-- [ ] Files use PascalCase.ts matching primary export
-- [ ] Generic params use `T` prefix
+- [ ] Classes: PascalCase + approved role suffix
+- [ ] Methods: camelCase + verb prefix
+- [ ] Private fields/methods: `_` prefix
+- [ ] Constants: SCREAMING_SNAKE_CASE
+- [ ] Enums: UPPER_SNAKE_CASE members
+- [ ] Event strings: `'NAMESPACE.EVENT_NAME'`
+- [ ] Files: PascalCase.ts matching primary export
+- [ ] Generics: `T` prefix
 
 ### Structure
 - [ ] No file exceeds 800 lines
 - [ ] No method exceeds 40 lines
-- [ ] Imports follow: external → internal → type-only order
-- [ ] `import type` used for type-only imports
-- [ ] Class uses `export default class`
-- [ ] Class body follows the 9-section structure (static → fields → constructor → getters → methods → private)
-- [ ] One-liner getters for simple property access
-- [ ] Named `setX()` methods, no property setters
+- [ ] Imports: external → internal → type-only
+- [ ] `import type` for type-only imports
+- [ ] `export default class` for primary class
+- [ ] Class body follows 9-section structure
+- [ ] One-liner getters, named `setX()` methods
 
 ### Type Safety
-- [ ] No `any` in exported types or interfaces
-- [ ] No `as any` except with documented justification
+- [ ] No `any` in exported types
+- [ ] No `as any` without documented justification
 - [ ] Public methods have explicit return types
-- [ ] Uses `| undefined` not `| null`
-- [ ] No non-null assertions (`!`) after boolean guards — uses type predicates or assertion functions
+- [ ] `| undefined` not `| null`
+- [ ] Type predicates or assertion functions, not `!` assertions
 - [ ] `as const satisfies` for constant arrays
 
 ### Error Handling
-- [ ] Uses `ErrorHandler.warning/error/fatalError`, not raw `throw`
-- [ ] Error messages follow `ClassName.methodName(): Description` format
-- [ ] `fatalError` only for unrecoverable invariant violations
+- [ ] `ErrorHandler.warning/error/fatalError`, not raw `throw`
+- [ ] Error messages: `ClassName.methodName(): Description`
+- [ ] `fatalError` only for unrecoverable invariants
 - [ ] No empty catch blocks
-- [ ] No `console.log` (use `ErrorHandler` or `console.info`)
+- [ ] No `console.log`
 
 ### Architecture
-- [ ] Event listeners paired with cleanup in `detach()`/`dispose()`
-- [ ] No monkey-patching of methods on other objects
+- [ ] Event listeners paired with cleanup
+- [ ] No monkey-patching
 - [ ] Options object pattern for configuration
 - [ ] Composition over inheritance
-- [ ] Controller pattern for entity behavior
+- [ ] Doesn't add to known God Classes
 
-### Performance (if touching hot paths)
-- [ ] Pre-allocated working variables for hot loops
+### Performance (hot paths)
+- [ ] Pre-allocated working variables
 - [ ] `matrixAutoUpdate = false` for Three.js objects
 - [ ] No string key concatenation in hot-path maps
-- [ ] Update thresholds for position/rotation changes
+- [ ] Update thresholds for position/rotation
 - [ ] Environmental entity flag for static objects
 
-### Protocol (if touching network layer)
-- [ ] Schema uses 1-3 char property keys with inline comments
-- [ ] Co-located TypeScript type + JSON Schema with `JSONSchemaType<T>`
-- [ ] `additionalProperties: false` on schemas
-- [ ] Packet validation at creation time (fail-fast)
+### Protocol (network layer)
+- [ ] 1-3 char property keys with inline comments
+- [ ] Co-located type + JSON Schema with `JSONSchemaType<T>`
+- [ ] `additionalProperties: false`
+- [ ] Validation at creation time (fail-fast)
 - [ ] Tuple wire format `[id, data, tick?]`
 
-### Data-Driven Design
-- [ ] No magic numbers — all numeric literals are named constants or config values
-- [ ] Tunable values (thresholds, rates, capacities) are configurable via options, not hardcoded
-- [ ] UI, logic, and data concerns are separated
-- [ ] No new defaults changed without backwards compatibility assessment
-- [ ] New features with tradeoffs are opt-in, not automatic
-
-### Backwards Compatibility
-- [ ] No default values changed silently
-- [ ] No public API signatures broken
-- [ ] Existing games work without code changes on upgrade
-- [ ] If breaking change is necessary, migration path documented
-- [ ] Change scales to large games (100+ entities, multiple worlds)
-
-### PR Process
-- [ ] PR description includes problem statement, testing done, AI tools used
-- [ ] At least 1 fresh-context AI review completed
-- [ ] Manual testing done on relevant platforms
-- [ ] `npm run typecheck` and `npm run lint` pass
-- [ ] Unit tests pass; new tests added for new behavior
-- [ ] Existing game regression considered
-
-### General Quality
+### Quality
+- [ ] No magic numbers
+- [ ] Tunable values configurable via options
 - [ ] No TODOs for error handling
-- [ ] No stale comments referencing values that change
+- [ ] No stale comments referencing changeable values
 - [ ] Configuration arrays are `readonly`
-- [ ] External input validated before merging into internal state
-- [ ] `async/await` used instead of `.then()` chains
-- [ ] No data-driven boilerplate (3+ identical patterns → use mapping table)
-- [ ] Doesn't add responsibilities to known God Classes
+- [ ] External input validated before internal use
+- [ ] `async/await` not `.then()` chains
+- [ ] No boilerplate (3+ identical patterns → mapping table)
 
 ---
 
 ## 12. ESLint Configuration Reference
 
-The server ESLint config (`server/eslint.config.js`) enforces:
-
 ```javascript
-// Key rules
 'indent': ['error', 2, { SwitchCase: 1 }],
 'quotes': ['error', 'single', { avoidEscape: true }],
 'semi': ['error', 'always'],
@@ -972,18 +738,16 @@ The server ESLint config (`server/eslint.config.js`) enforces:
 'arrow-parens': ['error', 'as-needed'],
 'newline-before-return': 'error',
 'linebreak-style': ['error', 'unix'],
-'@typescript-eslint/no-explicit-any': 'off',  // any is allowed (legacy)
+'@typescript-eslint/no-explicit-any': 'off',  // legacy; standard prohibits in new exported types
 '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
 '@typescript-eslint/no-floating-promises': 'error',
 '@typescript-eslint/await-thenable': 'error',
 '@typescript-eslint/prefer-optional-chain': 'error',
 ```
 
-**Note**: While `no-explicit-any` is off in ESLint, the coding standard prohibits `any` in new exported types. The ESLint rule is kept off for legacy compatibility only.
-
 ---
 
-## Appendix A: Codebase Architecture Overview
+## Appendix A: Architecture Overview
 
 ```
 GameServer (root singleton)
