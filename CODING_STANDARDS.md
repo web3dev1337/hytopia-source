@@ -116,28 +116,26 @@ const RECONNECT_WINDOW_MS = 30 * 1000;
 const MAX_ACTIVE_AUDIO_NODES = 64;
 private static readonly WALK_FORCE_THRESHOLD = 0.1;
 
-// DO: Config-driven
-const cooldownMs = weaponConfig.cooldownMs;
-const damage = weaponConfig.damage * playerDamageMultiplier;
-
 // DON'T: Magic numbers in logic
 if (distance < 16) { ... }           // what is 16?
 setTimeout(callback, 5000);           // why 5000?
-this._health -= 25;                   // where does 25 come from?
+if (count > 64) { ... }              // where does 64 come from?
 ```
 
 ### Data-Driven Over Hardcoded
 
-Game values (damage, cooldowns, speeds, costs, drop rates, animation names) belong in configuration files, not source code. Source code reads config; it doesn't define game balance.
+Tunable values (tick rates, thresholds, timeouts, capacities) should be configurable rather than buried in source code.
 
 ```typescript
-// DO: Read from config
-const damage = catalog.getWeapon(weaponId).damage;
-const spawnRate = balanceConfig.enemySpawnRatePerSecond;
+// DO: Configurable via options
+constructor(options: WorldOptions) {
+  this._tickRate = options.tickRate ?? 60;
+  this._gravity = options.gravity ?? { x: 0, y: -32, z: 0 };
+}
 
-// DON'T: Hardcode game values
-const SWORD_DAMAGE = 25;           // belongs in config
-const SPAWN_RATE = 0.5;            // belongs in config
+// DON'T: Bury tunable values in logic
+this._tickRate = 60;               // not configurable
+this._gravity = { x: 0, y: -32, z: 0 }; // not overridable
 ```
 
 ### Convention Over Configuration
@@ -927,8 +925,8 @@ Use this checklist when reviewing AI-generated pull requests.
 - [ ] Tuple wire format `[id, data, tick?]`
 
 ### Data-Driven Design
-- [ ] No magic numbers — all numeric literals in game logic are named constants or config values
-- [ ] Game values (damage, cooldowns, speeds, costs) come from config, not hardcoded in source
+- [ ] No magic numbers — all numeric literals are named constants or config values
+- [ ] Tunable values (thresholds, rates, capacities) are configurable via options, not hardcoded
 - [ ] UI, logic, and data concerns are separated
 - [ ] No new defaults changed without backwards compatibility assessment
 - [ ] New features with tradeoffs are opt-in, not automatic
