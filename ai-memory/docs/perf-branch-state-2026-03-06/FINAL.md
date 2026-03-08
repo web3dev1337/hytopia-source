@@ -144,13 +144,30 @@ Core files:
 - [link-sdk.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/link-sdk.sh)
 - [setup-game.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/setup-game.sh)
 - [run-external-game-benchmark.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/run-external-game-benchmark.sh)
+- [run-owned-stack-suite.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/run-owned-stack-suite.sh)
 
 What these do:
 
 - build the local SDK from this repo
 - link it into external game repos and install the linked SDK's external runtime deps
 - run a real-game preset end-to-end against an external game using the current source checkout under test
+- run the core synthetic presets plus owned-game presets from one wrapper command against a chosen engine branch, commit, or PR number
 - let HyFire2 or Zoo Game run against local engine changes
+
+The simplest “test this engine PR across our stack” entrypoint is now:
+
+```bash
+bash packages/perf-tools/scripts/run-owned-stack-suite.sh \
+  --engine-ref pr:2 \
+  --client-url http://localhost:4173
+```
+
+That wrapper can:
+
+- resolve a branch, commit, or `pr:<number>` to a temporary engine worktree
+- run internal synthetic presets with client metrics enabled
+- run Zoo Game and HyFire2 through the external-game wrapper with the owned local paths baked in
+- write all JSON outputs plus a per-run markdown summary into `packages/perf-tools/perf-results/owned-stack/`
 
 Important clarification:
 
