@@ -646,7 +646,7 @@ Documented weaknesses. New code should not make them worse. Improvements are wel
 | SRP | 6/10 | Entity, NetworkSynchronizer overloaded | Don't add responsibilities to God Classes |
 | DRY | 6/10 | 60+ identical handlers, 70+ identical setters | Use mapping tables for 3+ identical patterns |
 
-**God Classes — do not add to these files:**
+**God Classes — do not add new responsibilities to these files:**
 
 | Class | Lines | Should extract |
 |-------|-------|----------------|
@@ -698,7 +698,7 @@ Documented weaknesses. New code should not make them worse. Improvements are wel
 - [ ] No monkey-patching
 - [ ] Options object pattern for configuration
 - [ ] Composition over inheritance
-- [ ] Doesn't add to known God Classes
+- [ ] Doesn't add new responsibilities to known God Classes
 
 ### Performance (hot paths)
 - [ ] Pre-allocated working variables
