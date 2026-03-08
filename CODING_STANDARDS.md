@@ -21,6 +21,161 @@ These are non-negotiable. Any PR violating these should be rejected.
 | 9 | Use `async/await` over `.then()` chains | Clearer error handling, better stack traces |
 | 10 | Configuration arrays must be `readonly` | Prevents external mutation of internal state |
 | 11 | 3+ identical patterns → mapping table or helper | Prevents boilerplate sprawl |
+| 12 | No magic numbers | Extract to named constants or config |
+| 13 | Data-driven over hardcoded | Game values belong in config, not source code |
+| 14 | Defaults are sacred — change with extreme care | A default change silently affects every existing game |
+| 15 | Backwards compatibility required | Existing games must not break on SDK upgrade |
+| 16 | Prefer config/data files over code constants | Convention-over-configuration; separate data from logic |
+
+---
+
+## 0. Contribution & Review Process
+
+These rules apply to all contributions — human or AI.
+
+### 0.1 PR Requirements
+
+Every PR must include:
+- **Problem/benefit statement**: What problem does this solve or what value does it add?
+- **Testing done**: What manual and automated testing was performed? On which platforms (desktop, mobile, iOS, Android)?
+- **AI tools used**: Which AI models/harnesses were used for development and review?
+- **Backwards compatibility assessment**: Does this change have any chance of breaking existing games? If someone upgrades to this SDK version, do they need to change code or assets on their end?
+- **Opt-in vs automatic**: If the change is 100% an upgrade in all situations, it should apply automatically with no code changes. If it has tradeoffs (e.g., performance cost for visual improvement), it should be opt-in.
+
+### 0.2 Review Layers
+
+PRs must pass through multiple review layers before merge:
+
+1. **Static type checks** — `npm run typecheck` must pass locally and in CI (GitHub Actions)
+2. **Linting** — `npm run lint` must pass
+3. **Unit tests** — pragmatic, high signal-to-noise tests that catch regressions
+4. **Performance tests** — run locally at minimum; CI integration where viable
+5. **AI code review** — at least 1 additional AI review with a **fresh context** (even if same model). Preferably 2 different tools (e.g., Claude Code + Codex). Codex can be hooked to GitHub for automatic review.
+6. **Human code review** — a human with code knowledge reviewing for: wrong architecture, code smells, bad practices, suspicious hardcoding. Not checking syntax — checking design.
+7. **Manual testing** — the PR submitter must have manually tested. Standard guides/tools for testing modified SDK code in a game must be provided. Test on multiple platforms.
+8. **Game regression testing** — where possible, run PRs against existing games (e.g., Hatch A Zoo, VoxFire) to verify no breakage. PR creators should provide evidence of testing against published games.
+
+### 0.3 Backwards Compatibility
+
+This is critical. A change that "works" but breaks existing games is worse than no change.
+
+```
+Questions every PR must answer:
+1. Does this change any default value?
+   → If yes, what existing behavior changes silently?
+2. Does this change any public API signature?
+   → If yes, what existing code breaks on upgrade?
+3. Does this change any wire protocol?
+   → If yes, what client/server version combinations break?
+4. Is this opt-in or automatic?
+   → Automatic changes must be universally beneficial with zero downsides
+   → Changes with tradeoffs must be opt-in
+```
+
+**Real examples of backwards compatibility failures:**
+- Changing default particle alpha → broke smoke grenade visuals in existing games
+- Changing player controller defaults → existing games behaved differently on upgrade
+- Changing character model conventions → existing games needed asset updates
+
+**Rule**: Default values are part of the API contract. Changing a default is a breaking change, even if the parameter is "optional."
+
+### 0.4 Best Solution / Robustness Check
+
+A PR might solve a real problem but:
+- Is it the **best** approach, or just the first approach that worked?
+- Does it account for **different game scenarios**? (e.g., a feature that works for 10 entities but kills performance with 1000)
+- Should it be **opt-in** with per-entity/per-world granularity?
+- Does it **scale** to large games?
+
+Reviewers should ask: "Would this work in Hatch A Zoo with hundreds of entities?"
+
+### 0.5 Quality Gate Stack
+
+| Layer | Tool/Method | When |
+|-------|------------|------|
+| Type safety | `npm run typecheck` | Every commit, CI |
+| Lint | `npm run lint` | Every commit, CI |
+| Unit tests | `npm run test` | Every commit, CI |
+| Perf tests | `npm run test:perf` (local) | Before PR, ideally CI |
+| AI review | Fresh-context AI review (1-2 tools) | Before PR |
+| Human review | Architecture/design review | Before merge |
+| Manual test | Desktop + mobile platforms | Before PR |
+| Game regression | Run against existing games | Before merge (where possible) |
+
+---
+
+## 0b. Data-Driven Design Principles
+
+### No Magic Numbers
+
+Every numeric literal in game logic must be a named constant or config value.
+
+```typescript
+// DO: Named constant
+const RECONNECT_WINDOW_MS = 30 * 1000;
+const MAX_ACTIVE_AUDIO_NODES = 64;
+private static readonly WALK_FORCE_THRESHOLD = 0.1;
+
+// DO: Config-driven
+const cooldownMs = weaponConfig.cooldownMs;
+const damage = weaponConfig.damage * playerDamageMultiplier;
+
+// DON'T: Magic numbers in logic
+if (distance < 16) { ... }           // what is 16?
+setTimeout(callback, 5000);           // why 5000?
+this._health -= 25;                   // where does 25 come from?
+```
+
+### Data-Driven Over Hardcoded
+
+Game values (damage, cooldowns, speeds, costs, drop rates, animation names) belong in configuration files, not source code. Source code reads config; it doesn't define game balance.
+
+```typescript
+// DO: Read from config
+const damage = catalog.getWeapon(weaponId).damage;
+const spawnRate = balanceConfig.enemySpawnRatePerSecond;
+
+// DON'T: Hardcode game values
+const SWORD_DAMAGE = 25;           // belongs in config
+const SPAWN_RATE = 0.5;            // belongs in config
+```
+
+### Convention Over Configuration
+
+Establish conventions that eliminate boilerplate configuration:
+- File naming conventions that auto-register content
+- Default values that cover 90% of use cases
+- Predictable patterns that don't require explicit wiring
+
+### Separate UI, Logic, and Data
+
+Three concerns, three layers. Never mix them:
+- **Data**: Config files, schemas, generated catalogs
+- **Logic**: Runtime systems, state management, game rules
+- **UI**: Presentation, HUD, modals, scene UI
+
+### Defaults Are Sacred
+
+Changing a default value is a **breaking change** in disguise. It silently alters behavior for every existing consumer.
+
+```typescript
+// DANGEROUS: Changing this default
+export interface ParticleEmitterOptions {
+  opacity?: number;  // was 1.0, someone changes to 0.8
+  // → Every game's particles suddenly become semi-transparent
+}
+
+// SAFE: Add new option with backwards-compatible default
+export interface ParticleEmitterOptions {
+  opacity?: number;       // stays 1.0
+  fadeOnDeath?: boolean;  // NEW, defaults to false (opt-in)
+}
+```
+
+Before changing any default:
+1. List every place the default is consumed
+2. Assess impact on existing games
+3. If any game would behave differently → it's a breaking change → requires migration path or opt-in
 
 ---
 
@@ -770,6 +925,28 @@ Use this checklist when reviewing AI-generated pull requests.
 - [ ] `additionalProperties: false` on schemas
 - [ ] Packet validation at creation time (fail-fast)
 - [ ] Tuple wire format `[id, data, tick?]`
+
+### Data-Driven Design
+- [ ] No magic numbers — all numeric literals in game logic are named constants or config values
+- [ ] Game values (damage, cooldowns, speeds, costs) come from config, not hardcoded in source
+- [ ] UI, logic, and data concerns are separated
+- [ ] No new defaults changed without backwards compatibility assessment
+- [ ] New features with tradeoffs are opt-in, not automatic
+
+### Backwards Compatibility
+- [ ] No default values changed silently
+- [ ] No public API signatures broken
+- [ ] Existing games work without code changes on upgrade
+- [ ] If breaking change is necessary, migration path documented
+- [ ] Change scales to large games (100+ entities, multiple worlds)
+
+### PR Process
+- [ ] PR description includes problem statement, testing done, AI tools used
+- [ ] At least 1 fresh-context AI review completed
+- [ ] Manual testing done on relevant platforms
+- [ ] `npm run typecheck` and `npm run lint` pass
+- [ ] Unit tests pass; new tests added for new behavior
+- [ ] Existing game regression considered
 
 ### General Quality
 - [ ] No TODOs for error handling
