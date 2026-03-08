@@ -152,8 +152,14 @@ program
     }
 
     const includeServerMetrics = hasServerMetrics(beforeInput) && hasServerMetrics(afterInput);
+    const usesLegacyServerMetrics = reportUsesLegacyServerMetrics(beforeInput) || reportUsesLegacyServerMetrics(afterInput);
     const includeClientMetrics = hasClientMetrics(beforeInput) && hasClientMetrics(afterInput);
     const includeClientRenderMetrics = includeClientMetrics && hasClientRenderMetrics(beforeInput) && hasClientRenderMetrics(afterInput);
+    const includeServerTailMetrics = includeServerMetrics && !usesLegacyServerMetrics;
+    const includeServerBudgetMetrics = includeServerMetrics && !usesLegacyServerMetrics;
+    const includeServerNetworkMetrics = includeServerMetrics && !usesLegacyServerMetrics
+      && before.network !== undefined
+      && after.network !== undefined;
 
     if (!includeServerMetrics && !includeClientMetrics) {
       console.error('Cannot compare these reports because they do not share any comparable metric categories.');
@@ -162,6 +168,8 @@ program
 
     if (!includeServerMetrics) {
       console.log('Skipping server metrics: one or both reports lack server snapshots.');
+    } else if (usesLegacyServerMetrics) {
+      console.log('Skipping server p99, budget, and network metrics: one or both reports used the legacy server perf API.');
     }
 
     if (!includeClientMetrics) {
@@ -176,6 +184,9 @@ program
       `${path.basename(beforePath)} vs ${path.basename(afterPath)}`,
       {
         includeServerMetrics,
+        includeServerTailMetrics,
+        includeServerBudgetMetrics,
+        includeServerNetworkMetrics,
         includeClientMetrics,
         includeClientRenderMetrics,
       },
@@ -220,6 +231,10 @@ function hasServerMetrics(input: ReturnType<typeof BaselineComparer.loadInput>):
   }
 
   return input.baseline.avgTickMs > 0 || Object.keys(input.baseline.operations ?? {}).length > 0 || input.baseline.network !== undefined;
+}
+
+function reportUsesLegacyServerMetrics(input: ReturnType<typeof BaselineComparer.loadInput>): boolean {
+  return input.capabilities?.serverMetricSources?.includes('legacy_perf_api') ?? false;
 }
 
 function hasClientMetrics(input: ReturnType<typeof BaselineComparer.loadInput>): boolean {

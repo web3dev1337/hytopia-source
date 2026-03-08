@@ -44,6 +44,7 @@ export interface PhaseResult {
 
 export interface BenchmarkCapabilities {
   serverMetrics: boolean;
+  serverMetricSources: Array<'perf_harness' | 'legacy_perf_api'>;
   clientMetrics: boolean;
   clientMetricSources: Array<'perf_bridge' | 'webgl_fallback'>;
 }
@@ -644,6 +645,11 @@ export default class BenchmarkRunner {
   }
 
   private _buildCapabilities(metrics: CollectedMetrics): BenchmarkCapabilities {
+    const serverMetricSources = Array.from(new Set(
+      metrics.serverSnapshots
+        .map(snapshot => snapshot.source)
+        .filter((source): source is 'perf_harness' | 'legacy_perf_api' => source === 'perf_harness' || source === 'legacy_perf_api'),
+    ));
     const clientMetricSources = Array.from(new Set(
       metrics.clientSnapshots
         .map(snapshot => snapshot.source)
@@ -652,6 +658,7 @@ export default class BenchmarkRunner {
 
     return {
       serverMetrics: metrics.serverSnapshots.length > 0,
+      serverMetricSources,
       clientMetrics: metrics.clientSnapshots.length > 0,
       clientMetricSources,
     };
@@ -676,6 +683,10 @@ export default class BenchmarkRunner {
 
     if (!this._options.noPerfApi && collectedPhaseCount > 0 && !capabilities.serverMetrics) {
       warnings.push('No server snapshots were collected. This run only supports client-side comparison.');
+    }
+
+    if (capabilities.serverMetricSources.includes('legacy_perf_api')) {
+      warnings.push('Server metrics were normalized from a legacy /__perf endpoint. Network, budget, and p99 comparisons may be limited.');
     }
 
     if (capabilities.clientMetricSources.includes('webgl_fallback') && !capabilities.clientMetricSources.includes('perf_bridge')) {

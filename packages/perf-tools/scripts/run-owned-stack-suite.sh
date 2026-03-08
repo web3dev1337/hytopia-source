@@ -21,6 +21,7 @@ HYFIRE2_PRESET="hyfire2-bots"
 HYFIRE2_PORT="8082"
 HYFIRE2_SERVER_CMD="AUTO_START_WITH_BOTS=true hytopia start"
 KEEP_WORKTREE="false"
+INSTRUMENTATION_OVERLAY="true"
 
 WORKTREE_DIR=""
 ACTIVE_ENGINE_REPO="$ENGINE_REPO"
@@ -29,6 +30,7 @@ RESOLVED_LABEL=""
 SUMMARY_PATH=""
 CLIENT_SERVER_PID=""
 CLIENT_SERVER_LOG=""
+OVERLAY_MANIFEST=""
 
 declare -a SUMMARY_ROWS=()
 
@@ -55,6 +57,8 @@ Options:
   --hyfire2-dir <path>       HyFire2 repo/worktree
   --hyfire2-preset <name>    HyFire2 preset to run
   --hyfire2-port <port>      HyFire2 external server port
+  --no-instrumentation-overlay
+                             Do not patch older target refs with temporary perf hooks
   --keep-worktree            Leave the temporary engine worktree on disk
   -h, --help                 Show this help
 
@@ -169,6 +173,10 @@ while [[ $# -gt 0 ]]; do
       KEEP_WORKTREE="true"
       shift
       ;;
+    --no-instrumentation-overlay)
+      INSTRUMENTATION_OVERLAY="false"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -192,6 +200,22 @@ prepare_engine_checkout() {
     --source-repo "$ENGINE_REPO" \
     --target-repo "$ACTIVE_ENGINE_REPO" \
     --packages "server,client,protocol"
+}
+
+apply_instrumentation_overlay() {
+  if [[ "$INSTRUMENTATION_OVERLAY" != "true" ]]; then
+    return
+  fi
+
+  bash "$TOOLS_REPO/packages/perf-tools/scripts/apply-instrumentation-overlay.sh" \
+    --source-engine-repo "$TOOLS_REPO" \
+    --target-engine-repo "$ACTIVE_ENGINE_REPO"
+
+  if [[ -f "$ACTIVE_ENGINE_REPO/.perf-tools-overlay.json" ]]; then
+    OVERLAY_MANIFEST="$ACTIVE_ENGINE_REPO/.perf-tools-overlay.json"
+  else
+    OVERLAY_MANIFEST=""
+  fi
 }
 
 start_client_server() {
@@ -225,7 +249,30 @@ start_client_server() {
 }
 
 can_run_internal_presets() {
-  [[ -f "$ACTIVE_ENGINE_REPO/server/src/perf-harness.ts" ]]
+  [[ -f "$ACTIVE_ENGINE_REPO/server/src/perf/perf-harness.ts" ]] || return 1
+
+  node -e "const pkg=require(process.argv[1]); process.exit(pkg.scripts && pkg.scripts['build:perf-harness'] ? 0 : 1)" \
+    "$ACTIVE_ENGINE_REPO/server/package.json" >/dev/null 2>&1
+}
+
+server_supports_action_api() {
+  if [[ -n "$OVERLAY_MANIFEST" && -f "$OVERLAY_MANIFEST" ]]; then
+    node -e "const data=require(process.argv[1]); process.exit(data.server?.actionApi ? 0 : 1)" \
+      "$OVERLAY_MANIFEST" >/dev/null 2>&1
+    return
+  fi
+
+  [[ -f "$ACTIVE_ENGINE_REPO/server/src/perf/PerfHarness.ts" ]] || return 1
+  rg -q '/__perf/action' "$ACTIVE_ENGINE_REPO/server/src/perf/PerfHarness.ts"
+}
+
+preset_requires_server_actions() {
+  local preset="$1"
+  local preset_path="$TOOLS_REPO/packages/perf-tools/src/presets/${preset}.yaml"
+
+  [[ -f "$preset_path" ]] || return 1
+
+  rg -q 'type: (spawn_bots|despawn_bots|load_map|generate_blocks|spawn_entities|despawn_entities|start_block_churn|stop_block_churn|create_worlds|set_default_world|clear_world)' "$preset_path"
 }
 
 resolve_engine_checkout() {
@@ -304,6 +351,8 @@ write_summary() {
 - Resolved commit: \`$RESOLVED_COMMIT\`
 - Client URL: \`$CLIENT_URL\`
 - CPU throttle: \`${CPU_THROTTLE:-none}\`
+- Instrumentation overlay: \`${INSTRUMENTATION_OVERLAY}\`
+- Overlay manifest: \`${OVERLAY_MANIFEST:-none}\`
 - Internal presets: \`$internal_display\`
 - External games: \`$external_display\`
 - Output dir: \`$output_dir\`
@@ -331,6 +380,7 @@ EOF
 }
 
 resolve_engine_checkout
+apply_instrumentation_overlay
 prepare_engine_checkout
 
 OUTPUT_DIR="$OUTPUT_ROOT/$RESOLVED_LABEL-$(date +%Y%m%d-%H%M%S)"
@@ -364,6 +414,12 @@ if [[ "$INTERNAL_PRESETS" != "none" ]]; then
   if can_run_internal_presets; then
     for preset in "${INTERNAL_PRESET_ARRAY[@]}"; do
       [[ -z "$preset" ]] && continue
+
+      if ! server_supports_action_api && preset_requires_server_actions "$preset"; then
+        echo "WARNING: skipping $preset because the target ref only has snapshot/reset perf overlay support" >&2
+        SUMMARY_ROWS+=("| $preset | internal | skipped | server action API unavailable |")
+        continue
+      fi
 
       cmd=(
         npx tsx src/cli.ts run

@@ -18,6 +18,7 @@ export interface CollectedMetrics {
 
 export interface ServerSnapshot {
   timestamp: number;
+  source?: 'perf_harness' | 'legacy_perf_api';
   avgTickMs: number;
   maxTickMs: number;
   p95TickMs: number;

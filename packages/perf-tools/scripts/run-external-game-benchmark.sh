@@ -13,6 +13,7 @@ PORT="9091"
 CPU_THROTTLE=""
 OUTPUT=""
 VERBOSE="false"
+INSTRUMENTATION_OVERLAY="true"
 
 usage() {
   cat <<'EOF'
@@ -30,6 +31,8 @@ Options:
   --port <port>          HTTPS port for the external game server (default: 9091)
   --cpu-throttle <rate>  Browser CPU throttle rate (example: 4, 16)
   --output <path>        Write benchmark JSON to this path
+  --no-instrumentation-overlay
+                         Do not patch older engine refs with temporary perf hooks
   --verbose              Enable verbose benchmark logging
 
 Examples:
@@ -97,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       OUTPUT="$2"
       shift 2
       ;;
+    --no-instrumentation-overlay)
+      INSTRUMENTATION_OVERLAY="false"
+      shift
+      ;;
     --verbose)
       VERBOSE="true"
       shift
@@ -137,6 +144,11 @@ trap cleanup EXIT INT TERM
 
 echo "==> Linking SDK checkout into external game"
 echo "Engine repo: $ENGINE_REPO"
+if [[ "$INSTRUMENTATION_OVERLAY" == "true" ]]; then
+  bash "$SCRIPT_DIR/apply-instrumentation-overlay.sh" \
+    --source-engine-repo "$REPO_ROOT" \
+    --target-engine-repo "$ENGINE_REPO"
+fi
 bash "$SCRIPT_DIR/link-sdk.sh" --engine-repo "$ENGINE_REPO"
 bash "$SCRIPT_DIR/setup-game.sh" "$GAME_DIR" --engine-repo "$ENGINE_REPO"
 

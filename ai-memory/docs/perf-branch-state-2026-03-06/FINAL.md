@@ -181,8 +181,8 @@ That wrapper can:
 
 Important limitation:
 
-- very old engine refs can still produce client-only real-game reports if they predate PerfHarness server snapshots
-- those runs are still valid for FPS/frame-time comparison when the client loads, but the framework now labels them that way explicitly instead of pretending they are full-stack apples-to-apples
+- very old engine refs now get a temporary instrumentation overlay first, which patches in the current client `PerfBridge`, a compatible server `PerfHarness` shim, and the legacy entrypoint glue needed for repeatable real-game runs
+- if a target ref still cannot expose the full modern server metric surface after that overlay, the framework falls back to normalized legacy `/__perf` snapshots and labels the missing metric families explicitly instead of pretending they are full-stack apples-to-apples
 
 Important clarification:
 
@@ -267,11 +267,12 @@ This cleanup retains the broadly reusable framework improvements that were still
 - `--external-server` support in [cli.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/cli.ts)
 - `send_chat` scenario action in [ScenarioLoader.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ScenarioLoader.ts)
 - chat-triggered setup support in [HeadlessClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/HeadlessClient.ts)
-- external-server handling and client-only baseline generation in [BenchmarkRunner.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkRunner.ts)
+- external-server handling, legacy-server metric normalization, and validation-aware baseline generation in [BenchmarkRunner.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/BenchmarkRunner.ts)
 - a cleaned [zoo-game-full.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-full.yaml) preset
 - a documented [zoo-game-observe.yaml](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/presets/zoo-game-observe.yaml) preset for live join/observation runs
 - runner-level `--cpu-throttle` support so desktop/mobile/low-end comparisons no longer require editing YAML
-- scoped local HTTPS handling in [ServerApiClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ServerApiClient.ts) instead of a global TLS-disable environment hack
+- scoped local HTTPS handling and legacy `/__perf` snapshot compatibility in [ServerApiClient.ts](/home/ab/GitHub/hytopia/work1/packages/perf-tools/src/runners/ServerApiClient.ts) instead of a global TLS-disable environment hack
+- temporary target-ref instrumentation overlay support in [apply-instrumentation-overlay.sh](/home/ab/GitHub/hytopia/work1/packages/perf-tools/scripts/apply-instrumentation-overlay.sh)
 
 These are deliberate framework improvements, not feature-under-test patches.
 

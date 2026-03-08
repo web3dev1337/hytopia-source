@@ -62,6 +62,9 @@ export interface BaselineComparerOptions {
 
 export interface ComparisonScope {
   includeServerMetrics?: boolean;
+  includeServerTailMetrics?: boolean;
+  includeServerBudgetMetrics?: boolean;
+  includeServerNetworkMetrics?: boolean;
   includeClientMetrics?: boolean;
   includeClientRenderMetrics?: boolean;
 }
@@ -76,6 +79,10 @@ export interface LoadedBenchmarkInput {
     valid?: boolean;
     warnings?: string[];
     issues?: string[];
+  };
+  capabilities?: {
+    serverMetricSources?: string[];
+    clientMetricSources?: string[];
   };
 }
 
@@ -96,6 +103,9 @@ export default class BaselineComparer {
   ): ComparisonResult {
     const entries: ComparisonEntry[] = [];
     const includeServerMetrics = scope?.includeServerMetrics ?? true;
+    const includeServerTailMetrics = scope?.includeServerTailMetrics ?? includeServerMetrics;
+    const includeServerBudgetMetrics = scope?.includeServerBudgetMetrics ?? includeServerMetrics;
+    const includeServerNetworkMetrics = scope?.includeServerNetworkMetrics ?? includeServerMetrics;
     const includeClientMetrics = scope?.includeClientMetrics ?? true;
     const includeClientRenderMetrics = scope?.includeClientRenderMetrics ?? includeClientMetrics;
 
@@ -103,9 +113,15 @@ export default class BaselineComparer {
       entries.push(this._compareMetric('avgTickMs', baseline.avgTickMs, current.avgTickMs));
       entries.push(this._compareMetric('maxTickMs', baseline.maxTickMs, current.maxTickMs));
       entries.push(this._compareMetric('p95TickMs', baseline.p95TickMs, current.p95TickMs));
-      entries.push(this._compareMetric('p99TickMs', baseline.p99TickMs, current.p99TickMs));
-      entries.push(this._compareMetric('ticksOverBudgetPct', baseline.ticksOverBudgetPct, current.ticksOverBudgetPct));
       entries.push(this._compareMetric('avgMemoryMb', baseline.avgMemoryMb, current.avgMemoryMb));
+
+      if (includeServerTailMetrics) {
+        entries.push(this._compareMetric('p99TickMs', baseline.p99TickMs, current.p99TickMs));
+      }
+
+      if (includeServerBudgetMetrics) {
+        entries.push(this._compareMetric('ticksOverBudgetPct', baseline.ticksOverBudgetPct, current.ticksOverBudgetPct));
+      }
     }
 
     if (includeClientMetrics && baseline.avgFps !== undefined && current.avgFps !== undefined) {
@@ -123,7 +139,7 @@ export default class BaselineComparer {
       }
     }
 
-    if (includeServerMetrics && baseline.network && current.network) {
+    if (includeServerMetrics && includeServerNetworkMetrics && baseline.network && current.network) {
       entries.push(this._compareMetric('net.maxBytesSentPerSecond', baseline.network.maxBytesSentPerSecond, current.network.maxBytesSentPerSecond));
       entries.push(this._compareMetric('net.avgBytesSentPerSecond', baseline.network.avgBytesSentPerSecond, current.network.avgBytesSentPerSecond));
       entries.push(this._compareMetric('net.avgSerializationMs', baseline.network.avgSerializationMs, current.network.avgSerializationMs));
@@ -164,6 +180,7 @@ export default class BaselineComparer {
         baseline: data.baseline as BaselineResult,
         metrics: data.metrics,
         validation: data.validation,
+        capabilities: data.capabilities,
       };
     }
 

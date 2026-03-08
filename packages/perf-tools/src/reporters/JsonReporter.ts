@@ -17,6 +17,7 @@ export interface JsonReport {
   };
   capabilities?: {
     serverMetrics: boolean;
+    serverMetricSources: string[];
     clientMetrics: boolean;
     clientMetricSources: string[];
   };
@@ -44,6 +45,7 @@ export default class JsonReporter {
       },
       capabilities: {
         serverMetrics: result.capabilities.serverMetrics,
+        serverMetricSources: result.capabilities.serverMetricSources,
         clientMetrics: result.capabilities.clientMetrics,
         clientMetricSources: result.capabilities.clientMetricSources,
       },
