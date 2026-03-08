@@ -10,8 +10,9 @@ Every pull request must include:
 
 1. **Description** — What changed, why, and what it affects
 2. **Test evidence** — How you verified it works (screenshots, test output, repro steps)
-3. **Breaking change flag** — If defaults, public API signatures, or wire format changed, say so explicitly
-4. **Performance impact** — For runtime code changes: what targets were tested, any before/after numbers
+3. **Games tested** — Which games you tested against (SDK examples, your own game, etc.) and on what targets (desktop, mobile)
+4. **Breaking change flag** — If defaults, public API signatures, or wire format changed, say so explicitly
+5. **Performance impact** — For runtime code changes: what targets were tested, any before/after numbers
 
 ---
 
@@ -152,9 +153,10 @@ Changes to hot paths (tick loops, serialization, network sync) must include befo
 ### Game Regression
 
 Before merging changes that affect defaults, physics, networking, or entity behavior:
-1. Run at least one existing game against the branch
+1. Run at least one existing game against the branch — SDK examples, your own game, or both
 2. Verify no visual or behavioral differences
-3. Note any intentional changes in the PR description
+3. List which games you tested in the PR (e.g. "Tested with `examples/payload-game` and my own game")
+4. Note any intentional changes in the PR description
 
 ---
 
