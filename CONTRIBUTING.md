@@ -103,22 +103,37 @@ PRs pass through these layers in order. A failure at any layer blocks merge.
 | 2. Lint | ESLint enforces style rules | Yes (CI) |
 | 3. Unit tests | Verify isolated behavior | Yes (CI) |
 | 4. Performance tests | No regressions in hot paths | Yes (CI) |
-| 5. AI review | Fresh-context automated review against CODING_STANDARDS.md | Yes |
-| 6. Human review | Maintainer reviews architecture, intent, edge cases | No |
-| 7. Manual testing | Run affected systems, verify behavior | No |
-| 8. Game regression | Test against existing games to catch silent breakage | No |
+| 5. AI review (general) | Bug detection, logic errors, edge cases, merge readiness | Yes |
+| 6. AI review (standards) | CODING_STANDARDS.md compliance check | Yes |
+| 7. Human review | Maintainer reviews architecture, intent, edge cases | No |
+| 8. Manual testing | Run affected systems, verify behavior | No |
+| 9. Game regression | Test against existing games to catch silent breakage | No |
 
-### AI Review (Layer 5)
+### AI Review — General (Layer 5)
 
-Automated review runs with fresh context on every PR. The reviewer:
-- Checks the diff against CODING_STANDARDS.md hard rules
-- Flags backwards compatibility concerns
-- Identifies missing error handling or cleanup
-- Catches naming convention violations
+A general-purpose AI review with fresh context. Use multiple tools (e.g. Claude Code, Codex) for independent perspectives. The reviewer checks:
+- Bugs, logic errors, off-by-one mistakes
+- Edge cases and failure modes
+- Missing validation or error handling
+- Whether the change is actually ready to merge
 
-Fresh context is critical — the reviewer must not carry assumptions from previous reviews.
+Prompt should be open-ended: *"Review this PR for bugs, edge cases, and merge readiness"* — not limited to style.
 
-### Human Review (Layer 6)
+### AI Review — Standards (Layer 6)
+
+A separate, focused check against CODING_STANDARDS.md:
+- Hard rule violations
+- Naming convention mismatches
+- Backwards compatibility concerns
+- Missing cleanup or event listener pairing
+
+This is intentionally separate from the general review so style concerns don't crowd out bug detection.
+
+### Fresh Context for Both
+
+Each AI review must run with fresh context — no carry-over from previous reviews. This prevents the reviewer from developing blind spots about the codebase.
+
+### Human Review (Layer 7)
 
 Human reviewers focus on what automation cannot catch:
 - Does the change make architectural sense?
