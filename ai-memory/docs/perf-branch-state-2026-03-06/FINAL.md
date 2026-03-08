@@ -161,6 +161,7 @@ Cross-ref hardening added after testing `RZDESIGN/hytopia-source@merged-all-prs-
 - dependency reuse only happens when the target package lockfile or manifest matches; otherwise the target ref gets its own install
 - SDK linking for external-game runs now does a runtime `build:server` build instead of the full declaration/docs pipeline, so older engine refs do not fail just because their type/doc build is stale
 - the suite auto-picks the actual free client port starting from `4173` and launches Vite with `--strictPort`, preventing silent `4173` -> `4174` drift
+- `run-owned-stack-suite.sh` now resolves `--engine-ref pr:<n>` and other fetched refs through `origin` first and then `upstream`, so upstream PRs can be benchmarked directly from this fork checkout
 - benchmark JSON now records validation/capability state so missing snapshots are surfaced as warnings/issues instead of silently becoming zero baselines
 - `compare` now skips non-shared metric families such as server snapshots or render counters when one side lacks them, instead of treating missing data as an improvement
 

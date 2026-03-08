@@ -98,6 +98,23 @@ join_by() {
   done
 }
 
+fetch_engine_ref() {
+  local ref="$1"
+  local remote
+
+  for remote in origin upstream; do
+    if ! git -C "$ENGINE_REPO" remote get-url "$remote" >/dev/null 2>&1; then
+      continue
+    fi
+
+    if git -C "$ENGINE_REPO" fetch "$remote" "$ref"; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 cleanup() {
   if [[ -n "$CLIENT_SERVER_PID" ]]; then
     kill -TERM "-$CLIENT_SERVER_PID" >/dev/null 2>&1 || true
@@ -299,7 +316,7 @@ resolve_engine_checkout() {
   fi
 
   if [[ -n "$fetch_target" ]]; then
-    git -C "$ENGINE_REPO" fetch origin "$fetch_target"
+    fetch_engine_ref "$fetch_target"
     RESOLVED_COMMIT="$(git -C "$ENGINE_REPO" rev-parse FETCH_HEAD)"
     RESOLVED_LABEL="$(sanitize_slug "pr-${fetch_target#pull/}")"
     RESOLVED_LABEL="${RESOLVED_LABEL%-head}"
@@ -307,7 +324,7 @@ resolve_engine_checkout() {
     RESOLVED_COMMIT="$(git -C "$ENGINE_REPO" rev-parse "${ENGINE_REF}^{commit}")"
     RESOLVED_LABEL="$(sanitize_slug "${ENGINE_REF}-$(git -C "$ENGINE_REPO" rev-parse --short "$RESOLVED_COMMIT")")"
   else
-    git -C "$ENGINE_REPO" fetch origin "$ENGINE_REF"
+    fetch_engine_ref "$ENGINE_REF"
     RESOLVED_COMMIT="$(git -C "$ENGINE_REPO" rev-parse FETCH_HEAD)"
     RESOLVED_LABEL="$(sanitize_slug "${ENGINE_REF}-$(git -C "$ENGINE_REPO" rev-parse --short "$RESOLVED_COMMIT")")"
   fi
