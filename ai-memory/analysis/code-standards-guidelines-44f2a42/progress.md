@@ -7,3 +7,9 @@
 - [x] Code smells analysis (code-smells.md)
 - [x] SOLID principles analysis (principles-analysis.md)
 - [x] Compile final CODING_STANDARDS.md from all 6 reports
+- [x] Add mega-sappy guidelines (backwards compat, data-driven, review layers)
+- [x] Remove game-specific content (damage/weapon examples)
+- [x] Critical review and restructure into two documents
+- [x] CODING_STANDARDS.md — code quality only (13 hard rules, clean numbering)
+- [x] CONTRIBUTING.md — process/governance (PR reqs, review layers, backwards compat)
+- [x] Update PR #13 description
