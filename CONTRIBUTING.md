@@ -10,7 +10,7 @@ Every pull request must include:
 
 1. **Description** — What changed, why, and what it affects
 2. **Test evidence** — How you verified it works (screenshots, test output, repro steps)
-3. **Games tested** — Which games you tested against (SDK examples, your own game, etc.) and on what targets (desktop, mobile)
+3. **Games tested** — Which games (SDK examples, your own game, etc.), on what devices (desktop browser, mobile browser, specific OS), and what you did in-game to exercise the change
 4. **Breaking change flag** — If defaults, public API signatures, or wire format changed, say so explicitly
 5. **Performance impact** — For runtime code changes: what targets were tested, any before/after numbers
 
@@ -155,8 +155,11 @@ Changes to hot paths (tick loops, serialization, network sync) must include befo
 Before merging changes that affect defaults, physics, networking, or entity behavior:
 1. Run at least one existing game against the branch — SDK examples, your own game, or both
 2. Verify no visual or behavioral differences
-3. List which games you tested in the PR (e.g. "Tested with `examples/payload-game` and my own game")
-4. Note any intentional changes in the PR description
+3. In the PR, describe:
+   - **Which games** — e.g. `examples/payload-game`, your own game
+   - **Which devices** — e.g. Chrome desktop, Safari iOS, Android Chrome
+   - **What you did** — e.g. "spawned 20 entities, walked around, triggered physics collisions, tested on mobile with 3 players"
+4. Note any intentional behavior changes in the PR description
 
 ---
 
